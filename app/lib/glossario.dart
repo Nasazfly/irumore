@@ -1,0 +1,56 @@
+class Voce {
+  final String titolo, testo;
+  const Voce(this.titolo, this.testo);
+}
+
+const glossario = <String, Voce>{
+  'LAS': Voce('LAS · livello istantaneo (Slow)', "Livello di pressione sonora ponderato in curva A con costante di tempo Slow (1 secondo). È il numero che si muove sul display di un fonometro: segue le variazioni del rumore in modo morbido, senza i picchi più rapidi. Nell'app viene letto ogni secondo."),
+  'LAeq': Voce('LAeq · livello continuo equivalente', "È il livello costante, in dB(A), che nello stesso intervallo di tempo trasporterebbe la stessa energia sonora del rumore reale, che invece varia. Non è una media aritmetica dei valori letti: i momenti più rumorosi pesano di più. È il parametro con cui si confrontano di norma i limiti. Nell'app è calcolato dall'avvio (o dall'ultimo Reset) fino a ora."),
+  'LASmax': Voce('LASmax · massimo', "Il valore più alto raggiunto dal LAS (curva A, Slow) durante la misura. Serve, per esempio, per valutare il rumore di impianti a funzionamento discontinuo come un ascensore o uno scarico."),
+  'LASmin': Voce('LASmin · minimo', "Il valore più basso del LAS durante la misura. Dà un'idea del rumore nei momenti più silenziosi, ma non sostituisce la misura del rumore residuo."),
+  'dBA': Voce('dB(A) · ponderazione A', "Decibel misurati con la curva di ponderazione A, che attenua le frequenze molto basse e molto alte per avvicinarsi a come le percepisce l'orecchio umano. È la scala usata per i limiti di rumore ambientale."),
+  'offset': Voce('Offset di taratura', "Correzione, in dB, aggiunta alla lettura del microfono del telefono per allinearla a quella del tuo fonometro professionale. Si regola confrontando i due strumenti con un rumore stazionario. Vale solo per questo telefono e questa posizione. Il microfono di uno smartphone non è uno strumento di classe 1 o 2: la misura resta indicativa."),
+  'LA': Voce('LA · rumore ambientale', "Livello di rumore complessivo misurato nel punto di interesse con la sorgente da verificare in funzione, insieme a tutte le altre sorgenti presenti. Nel criterio differenziale si misura al ricettore, a finestre aperte o chiuse."),
+  'LR': Voce('LR · rumore residuo', "Livello di rumore che si misura nello stesso punto con la sorgente da verificare spenta: è il rumore che resta senza di essa. Si consiglia di misurarlo nelle stesse condizioni di LA (stesso punto, stesso periodo, stesse finestre)."),
+  'dL': Voce('ΔL · criterio differenziale', "Differenza tra rumore ambientale e rumore residuo: ΔL = LA − LR. Il limite differenziale di immissione è 5 dB di giorno e 3 dB di notte. Si applica solo se il rumore ambientale raggiunge una soglia che dipende da periodo e finestre (50 e 40 dB(A) a finestre aperte, 35 e 25 dB(A) a finestre chiuse)."),
+  'soglia': Voce('Soglia di applicabilità', "Livello di LA sotto il quale il criterio differenziale non si applica, perché il rumore è considerato trascurabile: finestre aperte 50 dB(A) di giorno e 40 di notte, finestre chiuse 35 e 25. Se LA è pari o superiore alla soglia, la verifica va eseguita."),
+  'condizioni': Voce('Condizioni di misura al ricettore', "Periodo: diurno dalle 6 alle 22, notturno dalle 22 alle 6. Finestre: aperte o chiuse durante la misura nell'ambiente abitativo. Queste due scelte determinano la soglia di applicabilità e il limite di ΔL (5 dB di giorno, 3 di notte)."),
+  'esclusioni': Voce('Esclusioni dal differenziale', "Il criterio differenziale non si applica nelle aree di classe VI né a certe sorgenti, come le infrastrutture di trasporto (strade, ferrovie, ecc.) e gli impianti di comfort dell'edificio per il disturbo interno allo stesso edificio. Attiva l'interruttore solo se sei certo che il caso rientri; si consiglia di verificare il testo vigente."),
+  'immissione': Voce('Immissione', "Rumore complessivo, prodotto da tutte le sorgenti, presente nell'ambiente esterno o abitativo e misurato in prossimità dei ricettori. Il limite assoluto di immissione dipende dalla classe di zonizzazione e dal periodo."),
+  'emissione': Voce('Emissione', "Rumore emesso da una singola sorgente, misurato in prossimità della sorgente stessa. Ha limiti propri, in genere inferiori a quelli di immissione."),
+  'LS': Voce('LS · livello della sola sorgente', "Livello di rumore prodotto dalla sola sorgente specifica, senza il contributo del rumore residuo. Si può ricavare sottraendo il residuo dal livello misurato a sorgente attiva (funzione Differenza di sorgenti)."),
+  'classe': Voce('Classe di zonizzazione acustica', "Classificazione del territorio fatta dal Comune. I: aree particolarmente protette. II: prevalentemente residenziali. III: aree di tipo misto. IV: aree di intensa attività umana. V: prevalentemente industriali. VI: esclusivamente industriali. Ogni classe ha limiti diversi per giorno e notte."),
+  'periodo': Voce('Periodo di riferimento', "Diurno: dalle 6:00 alle 22:00. Notturno: dalle 22:00 alle 6:00. I limiti notturni sono più bassi."),
+  'Lsorg': Voce('Livello della sorgente', "Livello di pressione sonora, in dB, prodotto da una singola sorgente e misurato nello stesso punto delle altre. Per sommare più sorgenti vanno inseriti tutti i livelli riferiti allo stesso punto di misura."),
+  'Ltot': Voce('Livello totale', "Livello misurato quando sono presenti insieme la sorgente di interesse e il rumore di fondo. Da questo si sottrae il fondo per ottenere il livello della sola sorgente."),
+  'fondo': Voce('Rumore di fondo', "Livello misurato con la sorgente di interesse spenta (corrisponde al rumore residuo). Se la differenza tra livello totale e fondo è inferiore a 3 dB, il risultato della sottrazione è poco affidabile."),
+  'L1': Voce('Livello L1 misurato', "Livello di pressione sonora misurato a una certa distanza d1 dalla sorgente: è il punto di partenza per stimare il livello a un'altra distanza."),
+  'd1': Voce('Distanze d1 e d2', "d1 è la distanza dalla sorgente alla quale hai misurato L1; d2 è la distanza alla quale vuoi stimare il livello. Entrambe in metri, misurate dal centro della sorgente."),
+  'Lt': Voce('Livello da raggiungere', "Livello obiettivo (per esempio un limite). L'app calcola a quale distanza d2 il livello scende fino a quel valore, in campo libero."),
+  'puntiforme': Voce('Sorgente puntiforme o lineare', "Puntiforme: sorgente piccola rispetto alla distanza (un macchinario, un impianto): il livello cala di 6 dB a ogni raddoppio della distanza. Lineare: sorgente lunga come una strada trafficata o un treno: cala di circa 3 dB a ogni raddoppio. Il calcolo è in campo libero e non include barriere, suolo, aria, riflessioni."),
+  'Lp': Voce('Lp · livello di pressione sonora', "Quanto forte si sente il rumore in un punto: dipende dalla sorgente, dalla distanza e dall'ambiente. È la grandezza che misura il fonometro."),
+  'Lw': Voce('Lw · livello di potenza sonora', "Caratteristica della sorgente stessa, indipendente dalla distanza e dall'ambiente: indica quanta energia sonora emette. Dal livello di potenza si calcola il livello di pressione a qualsiasi distanza."),
+  'r': Voce('Distanza r', "Distanza in metri tra la sorgente e il punto in cui si considera il livello di pressione."),
+  'Q': Voce('Q · fattore di direttività', "Indica come la sorgente concentra il suono: Q=1 sorgente in aria libera (sfera), Q=2 appoggiata su un piano riflettente come il terreno (semisfera), Q=4 vicino a uno spigolo, Q=8 in un angolo. Più Q è alto, più alto è il livello a parità di potenza."),
+  'Li': Voce("Livello dell'intervallo", "Livello equivalente, in dB, misurato in ciascun intervallo di tempo. La media energetica li combina pesandoli con la durata."),
+  'ti': Voce("Durata dell'intervallo", "Durata di ogni intervallo, in qualsiasi unità purché la stessa per tutte le righe: l'app usa i minuti."),
+  'Vol': Voce('Volume V', "Volume dell'ambiente in metri cubi (area di pavimento per altezza media)."),
+  'Sup': Voce('Area della superficie', "Area in m² di ciascun tipo di superficie dell'ambiente (pavimento, pareti, soffitto, ecc.), da abbinare al suo coefficiente di assorbimento. Si consiglia di inserire tutte le superfici principali."),
+  'alfa': Voce('α · coefficiente di assorbimento', "Frazione di energia sonora assorbita da una superficie: 0 vuol dire che riflette tutto, 1 che assorbe tutto. Dipende dal materiale e dalla frequenza: si usa di solito un valore medio, preso dai dati del produttore."),
+  'Aextra': Voce('Assorbimento aggiuntivo', "Assorbimento di arredi, persone e oggetti non compresi nelle superfici, espresso in m² sabine (area equivalente di assorbimento)."),
+  'T60': Voce('T60 · tempo di riverberazione', "Tempo che il suono impiega a decadere di 60 dB dopo l'interruzione della sorgente. Più è lungo, più l'ambiente è riverberante. La formula di Sabine è adatta ad ambienti poco assorbenti; Eyring è più adatta quando l'assorbimento medio è alto."),
+  'Rw': Voce("R'w · potere fonoisolante apparente", "Indice di valutazione dell'isolamento acustico tra due unità immobiliari, misurato in opera sulla partizione (parete o solaio). Più è alto, meglio isola. Deve essere maggiore o uguale al limite."),
+  'D2m': Voce('D2m,nT,w · isolamento di facciata', "Indice di valutazione dell'isolamento acustico standardizzato di facciata: quanto la facciata protegge l'ambiente interno dal rumore esterno. Più è alto, meglio isola. Deve essere maggiore o uguale al limite."),
+  'Ln': Voce("L'n,w · rumore di calpestio", "Indice di valutazione del livello di rumore di calpestio normalizzato: quanto rumore passa all'unità sotto quando si cammina o cade qualcosa sul solaio. Più è basso, meglio è. Deve essere minore o uguale al limite."),
+  'LASmaxImp': Voce('LASmax · impianti a funzionamento discontinuo', "Livello massimo (curva A, Slow) del rumore degli impianti che funzionano a intermittenza, per esempio ascensori, scarichi idraulici, rubinetteria, servizi igienici. Misurato nell'ambiente disturbato, deve essere minore o uguale al limite."),
+  'LAeqImp': Voce('LAeq · impianti a funzionamento continuo', "Livello equivalente (curva A) del rumore degli impianti sempre attivi, come riscaldamento, aerazione e condizionamento. Misurato nell'ambiente disturbato, deve essere minore o uguale al limite."),
+  'categoria': Voce("Categoria dell'edificio", "Categorie del D.P.C.M. 5/12/1997: A residenze o assimilabili; B uffici; C alberghi e pensioni; D ospedali, cliniche e case di cura; E scuole; F attività ricreative o di culto; G attività commerciali. La categoria decide i limiti da rispettare."),
+};
+
+const gruppiGlossario = <String, List<String>>{
+  'Fonometro': ['LAS', 'LAeq', 'LASmax', 'LASmin', 'dBA', 'offset'],
+  'Limiti e differenziale': ['immissione', 'emissione', 'classe', 'periodo', 'LA', 'LR', 'LS', 'dL', 'soglia', 'condizioni', 'esclusioni'],
+  'Calcoli in decibel': ['Lsorg', 'Ltot', 'fondo', 'L1', 'd1', 'Lt', 'puntiforme', 'Lp', 'Lw', 'r', 'Q', 'Li', 'ti'],
+  'Riverberazione': ['Vol', 'Sup', 'alfa', 'Aextra', 'T60'],
+  'Requisiti acustici passivi': ['categoria', 'Rw', 'D2m', 'Ln', 'LASmaxImp', 'LAeqImp'],
+};

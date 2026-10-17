@@ -1,0 +1,19 @@
+name: irumore
+description: IRumore - strumenti di acustica per il campo
+publish_to: none
+version: 0.4.0+4
+environment:
+  sdk: ">=3.3.0 <5.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.3.0
+  record: ^6.0.0
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
+  wakelock_plus: ^1.2.8
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo_bianco.png
+    - assets/logo_verde.png
