@@ -1,4 +1,4 @@
-name: Build APK IRumore
+name: Build APK EnviNoise
 on:
   push:
   workflow_dispatch:
@@ -22,8 +22,8 @@ jobs:
           cp -r app/assets build_app/assets
           cp app/pubspec.yaml build_app/pubspec.yaml
           M=build_app/android/app/src/main/AndroidManifest.xml
-          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application#' $M
-          sed -i 's#android:label="[^"]*"#android:label="IRumore"#' $M
+          sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <application#' $M
+          sed -i 's#android:label="[^"]*"#android:label="EnviNoise"#' $M
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_app/android/app/build.gradle*
           R=build_app/android/app/src/main/res
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
@@ -40,9 +40,9 @@ jobs:
         run: |
           SDK=${ANDROID_HOME:-$ANDROID_SDK_ROOT}
           APKSIGNER=$(ls -d $SDK/build-tools/*/apksigner | sort -V | tail -1)
-          $APKSIGNER sign --key signing/key.pk8 --cert signing/cert.pem --out irumore.apk build_app/build/app/outputs/flutter-apk/app-release.apk
-          $APKSIGNER verify --print-certs irumore.apk
+          $APKSIGNER sign --key signing/key.pk8 --cert signing/cert.pem --out envinoise.apk build_app/build/app/outputs/flutter-apk/app-release.apk
+          $APKSIGNER verify --print-certs envinoise.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: irumore-apk
-          path: irumore.apk
+          name: envinoise-apk
+          path: envinoise.apk
