@@ -1,0 +1,48 @@
+name: Build APK IRumore
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Genera scheletro Android e inserisci il codice
+        run: |
+          flutter create --platforms=android --project-name irumore --org it.studioagfor build_app
+          rm -rf build_app/lib build_app/test
+          cp -r app/lib build_app/lib
+          cp -r app/assets build_app/assets
+          cp app/pubspec.yaml build_app/pubspec.yaml
+          M=build_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <application#' $M
+          sed -i 's#android:label="[^"]*"#android:label="IRumore"#' $M
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_app/android/app/build.gradle*
+          R=build_app/android/app/src/main/res
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p $R/mipmap-$d
+            cp app/icons/$d.png $R/mipmap-$d/ic_launcher.png
+          done
+          cat $M
+      - name: Compila APK
+        working-directory: build_app
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - name: Firma con la chiave fissa
+        run: |
+          SDK=${ANDROID_HOME:-$ANDROID_SDK_ROOT}
+          APKSIGNER=$(ls -d $SDK/build-tools/*/apksigner | sort -V | tail -1)
+          $APKSIGNER sign --key signing/key.pk8 --cert signing/cert.pem --out irumore.apk build_app/build/app/outputs/flutter-apk/app-release.apk
+          $APKSIGNER verify --print-certs irumore.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: irumore-apk
+          path: irumore.apk
