@@ -29,7 +29,8 @@ class DiffCard extends StatefulWidget {
   final double Function()? currentLaeq;
   final int Function()? currentSeconds;
   final VoidCallback? onCaptured;
-  const DiffCard({super.key, this.currentLaeq, this.currentSeconds, this.onCaptured});
+  final bool nudo;
+  const DiffCard({super.key, this.currentLaeq, this.currentSeconds, this.onCaptured, this.nudo = false});
   @override
   State<DiffCard> createState() => _DiffCardState();
 }
@@ -101,12 +102,13 @@ class _DiffCardState extends State<DiffCard> {
     final ric = st.richiesto(cur, secs);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: cLine)),
+      padding: widget.nudo ? EdgeInsets.zero : const EdgeInsets.all(16),
+      decoration: widget.nudo ? null : BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: cLine)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(children: [
+          if (!widget.nudo)
+            const Row(children: [
             Icon(Icons.rule, color: cTeal),
             SizedBox(width: 8),
             Text('Verifica differenziale', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: cInk)),

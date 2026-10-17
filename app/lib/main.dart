@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'calc_pages.dart';
 import 'core.dart';
 import 'diff.dart';
+import 'distanza_page.dart';
 import 'glossario_page.dart';
 import 'meter_page.dart';
 import 'norme_pages.dart';
+import 'riverbero_page.dart';
 
 void main() => runApp(const App());
 
@@ -12,7 +14,7 @@ class App extends StatelessWidget {
   const App({super.key});
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'IRumore',
+        title: 'EnviNoise',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -75,7 +77,7 @@ class Home extends StatelessWidget {
                     children: [
                       Image.asset('assets/logo_bianco.png', height: 30, alignment: Alignment.centerLeft),
                       const SizedBox(height: 18),
-                      const Text('IRumore', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
+                      const Text('EnviNoise', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
                       const Text('Strumenti di acustica per il campo', style: TextStyle(color: Color(0xFFBFE3DC), fontSize: 14)),
                     ],
                   ),
@@ -145,7 +147,19 @@ class Home extends StatelessWidget {
                     children: [
                       mini(context, Icons.gavel, 'Limiti di zona', 'Immissione ed emissione', const ZonePage()),
                       mini(context, Icons.rule, 'Differenziale', 'Verifica da campo', const DiffPage()),
-                      mini(context, Icons.apartment, 'Requisiti passivi', 'D.P.C.M. 5/12/1997', const PassiviPage()),
+                      mini(context, Icons.apartment, 'Requisiti passivi', 'Tabelle dei limiti', const PassiviPage()),
+                    ],
+                  ),
+                  sezione('STRUMENTI DA CAMPO'),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.25,
+                    children: [
+                      mini(context, Icons.map, 'Distanze su mappa', 'Distanze, raggio, edifici', const DistanzaPage()),
                       mini(context, Icons.menu_book, 'Glossario', 'Cosa sono LA, LR, LAeq...', const GlossarioPage()),
                     ],
                   ),

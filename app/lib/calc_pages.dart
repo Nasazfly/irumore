@@ -128,8 +128,8 @@ class _PropState extends State<PropagazionePage> {
       ),
       const SizedBox(height: 14),
       Field(c: l1, label: 'Livello L1 misurato', suffix: 'dB', info: 'L1', fonte: Fonte.laeq, onChanged: up),
-      Field(c: d1, label: 'Distanza d1 della misura', suffix: 'm', info: 'd1', onChanged: up, signed: false),
-      if (modo == 0) Field(c: d2, label: 'Distanza d2 di interesse', suffix: 'm', info: 'd1', onChanged: up, signed: false) else Field(c: lt, label: 'Livello da raggiungere', suffix: 'dB', info: 'Lt', onChanged: up),
+      Field(c: d1, label: 'Distanza d1 della misura', suffix: 'm', info: 'd1', fonte: Fonte.distanza, onChanged: up, signed: false),
+      if (modo == 0) Field(c: d2, label: 'Distanza d2 di interesse', suffix: 'm', info: 'd1', fonte: Fonte.distanza, onChanged: up, signed: false) else Field(c: lt, label: 'Livello da raggiungere', suffix: 'dB', info: 'Lt', onChanged: up),
       ResultCard(modo == 0 ? 'Livello alla distanza d2' : 'Distanza necessaria', modo == 0 ? '${f1(res)} dB' : '${f1(res)} m', sub: sub.isEmpty ? null : sub),
     ]);
   }
@@ -172,7 +172,7 @@ class _PotenzaState extends State<PotenzaPage> {
       ),
       const SizedBox(height: 12),
       Field(c: v, label: modo == 0 ? 'Pressione sonora Lp' : 'Potenza sonora Lw', suffix: 'dB', info: modo == 0 ? 'Lp' : 'Lw', fonte: modo == 0 ? Fonte.laeq : null, onChanged: up),
-      Field(c: r, label: 'Distanza r dalla sorgente', suffix: 'm', info: 'r', onChanged: up, signed: false),
+      Field(c: r, label: 'Distanza r dalla sorgente', suffix: 'm', info: 'r', fonte: Fonte.distanza, onChanged: up, signed: false),
       ResultCard(modo == 0 ? 'Potenza sonora Lw' : 'Pressione sonora Lp', '${f1(res)} dB', sub: 'Campo libero, Q = $q'),
     ]);
   }
@@ -255,77 +255,6 @@ class _MediaState extends State<MediaPage> {
           ),
         ),
       ResultCard('Livello equivalente', '${f1(res)} dB', sub: n == 0 ? null : '$n intervalli · durata totale ${f1(tot)} min'),
-    ]);
-  }
-}
-
-// ───────── Tempo di riverberazione ─────────
-class RiverberoPage extends StatefulWidget {
-  const RiverberoPage({super.key});
-  @override
-  State<RiverberoPage> createState() => _RiverState();
-}
-
-class _RiverState extends State<RiverberoPage> {
-  final vol = TextEditingController(), extra = TextEditingController();
-  final ss = [TextEditingController(), TextEditingController(), TextEditingController()];
-  final al = [TextEditingController(), TextEditingController(), TextEditingController()];
-  void up() => setState(() {});
-
-  @override
-  Widget build(BuildContext context) {
-    final v = pn(vol.text);
-    var a = 0.0, s = 0.0;
-    for (var i = 0; i < ss.length; i++) {
-      final si = pn(ss[i].text), ai = pn(al[i].text);
-      if (si != null && ai != null && si > 0 && ai >= 0 && ai <= 1) {
-        a += si * ai;
-        s += si;
-      }
-    }
-    final ex = pn(extra.text) ?? 0;
-    final at = a + ex;
-    final am = s > 0 ? a / s : double.nan;
-    var tS = double.nan, tE = double.nan;
-    if (v != null && v > 0 && at > 0) {
-      tS = 0.161 * v / at;
-      if (s > 0) {
-        final amt = at / s;
-        if (amt < 1) tE = 0.161 * v / (-s * log(1 - amt));
-      }
-    }
-    return page('Tempo di riverberazione', [
-      const InfoBox('Sabine: T = 0,161·V / A. Eyring: T = 0,161·V / (−S·ln(1 − α medio)). A è l\'area di assorbimento equivalente (Σ Si·αi, più eventuali oggetti o persone). Formule per campo sonoro diffuso: si consiglia prudenza con ambienti molto assorbenti o di forma irregolare.'),
-      Field(c: vol, label: 'Volume ambiente V', suffix: 'm³', info: 'Vol', onChanged: up, signed: false),
-      sezione('SUPERFICI (AREA E COEFFICIENTE α 0–1)'),
-      for (var i = 0; i < ss.length; i++)
-        Row(
-          children: [
-            Expanded(child: Field(c: ss[i], label: 'Area ${i + 1}', suffix: 'm²', info: 'Sup', onChanged: up, signed: false)),
-            const SizedBox(width: 8),
-            Expanded(child: Field(c: al[i], label: 'α ${i + 1}', info: 'alfa', onChanged: up, signed: false)),
-            if (ss.length > 1)
-              IconButton(
-                onPressed: () => setState(() {
-                  ss.removeAt(i).dispose();
-                  al.removeAt(i).dispose();
-                }),
-                icon: const Icon(Icons.remove_circle_outline, color: cDark),
-              ),
-          ],
-        ),
-      OutlinedButton.icon(
-        onPressed: () => setState(() {
-          ss.add(TextEditingController());
-          al.add(TextEditingController());
-        }),
-        icon: const Icon(Icons.add),
-        label: const Text('Aggiungi superficie'),
-      ),
-      const SizedBox(height: 10),
-      Field(c: extra, label: 'Assorbimento aggiuntivo (arredi, persone)', suffix: 'm² sabine', info: 'Aextra', onChanged: up, signed: false),
-      ResultCard('T60 secondo Sabine', '${f1(tS, 2)} s', info: 'T60', sub: 'A totale ${f1(at, 2)} m² · α medio ${f1(am, 2)}'),
-      ResultCard('T60 secondo Eyring', '${f1(tE, 2)} s', info: 'T60'),
     ]);
   }
 }

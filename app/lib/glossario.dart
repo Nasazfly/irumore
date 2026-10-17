@@ -6,6 +6,8 @@ class Voce {
 const glossario = <String, Voce>{
   'LAS': Voce('LAS · livello istantaneo (Slow)', "Livello di pressione sonora ponderato in curva A con costante di tempo Slow (1 secondo). È il numero che si muove sul display di un fonometro: segue le variazioni del rumore in modo morbido, senza i picchi più rapidi. Nell'app viene letto ogni secondo."),
   'LAeq': Voce('LAeq · livello continuo equivalente', "È il livello costante, in dB(A), che nello stesso intervallo di tempo trasporterebbe la stessa energia sonora del rumore reale, che invece varia. Non è una media aritmetica dei valori letti: i momenti più rumorosi pesano di più. È il parametro con cui si confrontano di norma i limiti. Nell'app è calcolato dall'avvio (o dall'ultimo Reset) fino a ora."),
+  'LAF': Voce('LAF · livello istantaneo (Fast)', "Come il LAS, ma con costante di tempo Fast (125 ms): segue più rapidamente le variazioni del rumore ed è quindi più nervoso. Utile per vedere i picchi o per confrontarsi con un fonometro impostato in Fast."),
+  'LAeq1s': Voce('LAeq,1s · finestra mobile di 1 secondo', "Livello equivalente calcolato sugli ultimi 1000 millisecondi (media energetica), aggiornato di continuo. Diversamente dal Slow non ha memoria esponenziale: dopo 1 secondo da un cambiamento il valore riflette interamente il nuovo livello. Va confrontato con il LAeq,1s del fonometro professionale."),
   'LASmax': Voce('LASmax · massimo', "Il valore più alto raggiunto dal LAS (curva A, Slow) durante la misura. Serve, per esempio, per valutare il rumore di impianti a funzionamento discontinuo come un ascensore o uno scarico."),
   'LASmin': Voce('LASmin · minimo', "Il valore più basso del LAS durante la misura. Dà un'idea del rumore nei momenti più silenziosi, ma non sostituisce la misura del rumore residuo."),
   'dBA': Voce('dB(A) · ponderazione A', "Decibel misurati con la curva di ponderazione A, che attenua le frequenze molto basse e molto alte per avvicinarsi a come le percepisce l'orecchio umano. È la scala usata per i limiti di rumore ambientale."),
@@ -37,6 +39,8 @@ const glossario = <String, Voce>{
   'Vol': Voce('Volume V', "Volume dell'ambiente in metri cubi (area di pavimento per altezza media)."),
   'Sup': Voce('Area della superficie', "Area in m² di ciascun tipo di superficie dell'ambiente (pavimento, pareti, soffitto, ecc.), da abbinare al suo coefficiente di assorbimento. Si consiglia di inserire tutte le superfici principali."),
   'alfa': Voce('α · coefficiente di assorbimento', "Frazione di energia sonora assorbita da una superficie: 0 vuol dire che riflette tutto, 1 che assorbe tutto. Dipende dal materiale e dalla frequenza: si usa di solito un valore medio, preso dai dati del produttore."),
+  'dim': Voce('Dimensioni della stanza', "Lunghezza, larghezza e altezza in metri, per una stanza di forma parallelepipeda. Da queste l'app ricava il volume e l'area totale di pavimento, soffitto e pareti, da coprire con le superfici e i materiali."),
+  'mat': Voce('Materiali ed elementi', "Per ogni superficie scegli il materiale, che fissa il coefficiente α. Persone e arredi sono elementi a quantità: ciascuno contribuisce con un'area di assorbimento equivalente in m² sabine e non conta come superficie dell'ambiente. I coefficienti proposti sono valori indicativi intorno a 500-1000 Hz: si consiglia di usare i dati del produttore con la voce Personalizzato."),
   'Aextra': Voce('Assorbimento aggiuntivo', "Assorbimento di arredi, persone e oggetti non compresi nelle superfici, espresso in m² sabine (area equivalente di assorbimento)."),
   'T60': Voce('T60 · tempo di riverberazione', "Tempo che il suono impiega a decadere di 60 dB dopo l'interruzione della sorgente. Più è lungo, più l'ambiente è riverberante. La formula di Sabine è adatta ad ambienti poco assorbenti; Eyring è più adatta quando l'assorbimento medio è alto."),
   'Rw': Voce("R'w · potere fonoisolante apparente", "Indice di valutazione dell'isolamento acustico tra due unità immobiliari, misurato in opera sulla partizione (parete o solaio). Più è alto, meglio isola. Deve essere maggiore o uguale al limite."),
@@ -48,9 +52,9 @@ const glossario = <String, Voce>{
 };
 
 const gruppiGlossario = <String, List<String>>{
-  'Fonometro': ['LAS', 'LAeq', 'LASmax', 'LASmin', 'dBA', 'offset'],
+  'Fonometro': ['LAS', 'LAF', 'LAeq1s', 'LAeq', 'LASmax', 'LASmin', 'dBA', 'offset'],
   'Limiti e differenziale': ['immissione', 'emissione', 'classe', 'periodo', 'LA', 'LR', 'LS', 'dL', 'soglia', 'condizioni', 'esclusioni'],
   'Calcoli in decibel': ['Lsorg', 'Ltot', 'fondo', 'L1', 'd1', 'Lt', 'puntiforme', 'Lp', 'Lw', 'r', 'Q', 'Li', 'ti'],
-  'Riverberazione': ['Vol', 'Sup', 'alfa', 'Aextra', 'T60'],
+  'Riverberazione': ['dim', 'mat', 'Sup', 'alfa', 'T60'],
   'Requisiti acustici passivi': ['categoria', 'Rw', 'D2m', 'Ln', 'LASmaxImp', 'LAeqImp'],
 };

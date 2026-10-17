@@ -13,6 +13,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'core.dart';
 import 'diff.dart';
 import 'dsp.dart';
+import 'norme_pages.dart';
 
 String stamp(DateTime d) {
   String t(int v) => v.toString().padLeft(2, '0');
@@ -35,11 +36,48 @@ class _MeterPageState extends State<MeterPage> {
   String? err;
   String? nota;
   double off = 0;
+  int modo = 0; // 0 Slow, 1 Fast, 2 LAeq 1 s
   DateTime t0 = DateTime.now();
+
+  Future<void> avviso() async {
+    var ok = false;
+    final r = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, ss) => AlertDialog(
+          title: const Text('Misura indicativa'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('La misura eseguita con il microfono dello smartphone non è conforme alla norma IEC 61672 (non è uno strumento di classe 1 o 2) e non è tarata da un laboratorio accreditato.\n\nI valori sono indicativi e NON sono utilizzabili in relazioni tecniche ufficiali, perizie o contenziosi legali.'),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: ok,
+                  onChanged: (v) => ss(() => ok = v ?? false),
+                  title: const Text('Ho letto e sono consapevole che la misura non è a norma e non è valida per relazioni o contenziosi.', style: TextStyle(fontSize: 13.5)),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Esci')),
+            FilledButton(onPressed: ok ? () => Navigator.pop(ctx, true) : null, child: const Text('Continua')),
+          ],
+        ),
+      ),
+    );
+    if (r != true && mounted) Navigator.pop(context);
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => avviso());
     SharedPreferences.getInstance().then((p) {
       if (mounted) setState(() => off = p.getDouble('offset') ?? 0);
     });
@@ -186,7 +224,7 @@ class _MeterPageState extends State<MeterPage> {
       final dir = await getTemporaryDirectory();
       final f = File('${dir.path}/hai_rumore_${DateTime.now().millisecondsSinceEpoch}.png');
       await f.writeAsBytes(bd!.buffer.asUint8List());
-      await Share.shareXFiles([XFile(f.path)], text: 'IRumore - LAeq ${f1(m.laeq(off))} dB(A) in ${mmss(m.seconds)}');
+      await Share.shareXFiles([XFile(f.path)], text: 'EnviNoise - LAeq ${f1(m.laeq(off))} dB(A) in ${mmss(m.seconds)}');
     } catch (e) {
       setState(() => err = 'Condivisione non riuscita: $e');
     }
@@ -216,7 +254,10 @@ class _MeterPageState extends State<MeterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final las = m.lasNow(off);
+    final big = modo == 0 ? m.lasNow(off) : (modo == 1 ? m.lafNow(off) : m.leq1s(off));
+    const etichette = ['LAS · ponderazione A · Slow', 'LAF · ponderazione A · Fast', 'LAeq,1s · finestra mobile di 1 s'];
+    const chiavi = ['LAS', 'LAF', 'LAeq1s'];
+    final fsE = m.fsEff;
     final leq = m.laeq(off);
     final mx = m.lasMax(off);
     final mn = m.lasMin(off);
@@ -234,15 +275,15 @@ class _MeterPageState extends State<MeterPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(children: [
-                    Text('LAS · ponderazione A · Slow', style: TextStyle(color: Color(0xFFBFE3DC), fontSize: 13, fontWeight: FontWeight.w600)),
-                    InfoDot('LAS', color: Color(0xFFBFE3DC)),
+                  Row(children: [
+                    Text(etichette[modo], style: const TextStyle(color: Color(0xFFBFE3DC), fontSize: 13, fontWeight: FontWeight.w600)),
+                    InfoDot(chiavi[modo], color: const Color(0xFFBFE3DC)),
                   ]),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(f1(las), style: const TextStyle(color: Colors.white, fontSize: 68, fontWeight: FontWeight.w700, height: 1.1)),
+                      Text(f1(big), style: const TextStyle(color: Colors.white, fontSize: 68, fontWeight: FontWeight.w700, height: 1.1)),
                       const SizedBox(width: 6),
                       const Text('dB(A)', style: TextStyle(color: Colors.white, fontSize: 20)),
                     ],
@@ -256,6 +297,16 @@ class _MeterPageState extends State<MeterPage> {
               child: Text(running ? 'In misura' : 'Fermo', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
             ),
           ],
+        ),
+      ),
+      const SizedBox(height: 10),
+      SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<int>(
+          showSelectedIcon: false,
+          segments: const [ButtonSegment(value: 0, label: Text('Slow')), ButtonSegment(value: 1, label: Text('Fast')), ButtonSegment(value: 2, label: Text('LAeq 1 s'))],
+          selected: {modo},
+          onSelectionChanged: (v) => setState(() => modo = v.first),
         ),
       ),
       const SizedBox(height: 10),
@@ -345,7 +396,15 @@ class _MeterPageState extends State<MeterPage> {
       const SizedBox(height: 10),
       const InfoBox('I valori misurati si possono importare nelle altre funzioni con il pulsante "Usa dato del fonometro del telefono" accanto ai campi. Tutte le funzioni accettano anche dati scritti a mano.'),
       const SizedBox(height: 4),
-      DiffCard(currentLaeq: () => m.laeq(off), currentSeconds: () => m.seconds, onCaptured: reset),
+      if (fsE != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Campionamento effettivo: ${f1(fsE / 1000)} kHz (atteso 48,0)', style: const TextStyle(fontSize: 11.5, color: cDark))),
+      if (fsE != null && (fsE - 48000).abs() / 48000 > 0.03)
+        const InfoBox('La frequenza di campionamento effettiva differisce da quella attesa: i tempi di integrazione e la ponderazione A potrebbero risultare alterati su questo telefono. Si consiglia di confrontare con il fonometro professionale.', color: cWarn, icon: Icons.warning_amber),
+      const Apribile(titolo: 'Limiti di zona', icona: Icons.gavel, child: ZoneCard()),
+      Apribile(
+        titolo: 'Verifica differenziale',
+        icona: Icons.rule,
+        child: DiffCard(nudo: true, currentLaeq: () => m.laeq(off), currentSeconds: () => m.seconds, onCaptured: reset),
+      ),
       if (nota != null) Padding(padding: const EdgeInsets.only(top: 10), child: InfoBox(nota!, color: cWarn, icon: Icons.warning_amber)),
       if (err != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(err!, style: const TextStyle(color: cBad))),
     ]);

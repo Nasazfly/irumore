@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'core.dart';
+import 'glossario.dart';
 
 // ───────── Limiti di zona e differenziale (D.P.C.M. 14/11/1997) ─────────
 const _limEm = [[45, 35], [50, 40], [55, 45], [60, 50], [65, 55], [65, 65]];
 const _limIm = [[50, 40], [55, 45], [60, 50], [65, 55], [70, 60], [70, 70]];
 const _classi = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
-class ZonePage extends StatefulWidget {
+class ZonePage extends StatelessWidget {
   const ZonePage({super.key});
   @override
-  State<ZonePage> createState() => _ZoneState();
+  Widget build(BuildContext context) => page('Limiti di zona', const [ZoneCard()]);
 }
 
-class _ZoneState extends State<ZonePage> {
+class ZoneCard extends StatefulWidget {
+  const ZoneCard({super.key});
+  @override
+  State<ZoneCard> createState() => _ZoneState();
+}
+
+class _ZoneState extends State<ZoneCard> {
   int cls = 2;
   bool notte = false;
   final la = TextEditingController(), ls = TextEditingController();
@@ -34,7 +41,7 @@ class _ZoneState extends State<ZonePage> {
       final ok = a <= em;
       esiti.add(Esito('Emissione della sorgente', 'LS = ${f1(a)} dB(A) rispetto al limite di $em dB(A): ${ok ? 'rispettato' : 'superato di ${f1(a - em)} dB'}.', ok));
     }
-    return page('Limiti di zona', [
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const InfoBox('Tabelle B e C del D.P.C.M. 14/11/1997 per la classe di zonizzazione acustica comunale. I livelli sono arrotondati a 0,5 dB (D.M. 16/03/1998). Per il criterio differenziale usa la funzione dedicata. Si consiglia di verificare il testo vigente e la zonizzazione del comune.'),
       sezioneInfo('CLASSE DI ZONIZZAZIONE', 'classe'),
       Wrap(spacing: 8, children: [for (var i = 0; i < 6; i++) ChoiceChip(label: Text(_classi[i]), selected: cls == i, onSelected: (_) => setState(() => cls = i))]),
@@ -73,41 +80,55 @@ const _cat = {
   'G': ['B, F, G', 'Commerciali'],
 };
 
-class PassiviPage extends StatefulWidget {
+class PassiviPage extends StatelessWidget {
   const PassiviPage({super.key});
-  @override
-  State<PassiviPage> createState() => _PassiviState();
-}
 
-class _PassiviState extends State<PassiviPage> {
-  String cat = 'A';
-  final cs = List.generate(5, (_) => TextEditingController());
-  void up() => setState(() {});
+  Widget cella(String t, {bool h = false, bool first = false}) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 9),
+        child: Text(
+          t,
+          textAlign: first ? TextAlign.left : TextAlign.center,
+          style: TextStyle(fontSize: h ? 11.5 : 13.5, fontWeight: (h || first) ? FontWeight.w700 : FontWeight.w500, color: h ? Colors.white : cInk),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final lim = _passivi[_cat[cat]![0]]!;
-    const nomi = ["R'w partizioni", 'D2m,nT,w facciata', "L'n,w calpestio", 'LASmax impianti discontinui', 'LAeq impianti continui'];
-    const unita = ['dB', 'dB', 'dB', 'dB(A)', 'dB(A)'];
-    const minimo = [true, true, false, false, false];
-    final esiti = <Widget>[];
-    for (var i = 0; i < 5; i++) {
-      final v = pn(cs[i].text);
-      if (v == null) continue;
-      final ok = minimo[i] ? v >= lim[i] : v <= lim[i];
-      esiti.add(Esito(nomi[i], 'Misurato ${f1(v)} ${unita[i]}, limite ${minimo[i] ? '≥' : '≤'} ${lim[i]} ${unita[i]}: ${ok ? 'rispettato' : 'non rispettato'}.', ok));
-    }
+    const intest = ["R'w ≥", 'D2m,nT,w ≥', "L'n,w ≤", 'LASmax ≤', 'LAeq ≤'];
+    var n = 0;
+    final righe = <TableRow>[
+      TableRow(decoration: const BoxDecoration(color: cTeal), children: [cella('Categoria', h: true, first: true), for (final h in intest) cella(h, h: true)]),
+      for (final e in _cat.entries)
+        TableRow(
+          decoration: BoxDecoration(color: (n++).isEven ? Colors.white : cBg),
+          children: [cella('${e.key} · ${e.value[1]}', first: true), for (final v in _passivi[e.value[0]]!) cella('$v')],
+        ),
+    ];
     return page('Requisiti acustici passivi', [
-      const InfoBox('Tabella B del D.P.C.M. 5/12/1997 per gli edifici classificati nella Tabella A. I limiti si riferiscono ai valori misurati secondo le norme di misura applicabili: si consiglia di verificare il testo vigente e le eventuali tolleranze.'),
-      sezioneInfo('CATEGORIA DELL\'EDIFICIO', 'categoria'),
-      Wrap(
-        spacing: 8,
-        children: [for (final e in _cat.entries) ChoiceChip(label: Text('${e.key} · ${e.value[1]}'), selected: cat == e.key, onSelected: (_) => setState(() => cat = e.key))],
+      const InfoBox('Tabelle del D.P.C.M. 5/12/1997: categorie degli edifici (Tab. A) e limiti per ciascun indice (Tab. B). Valori in dB; LASmax e LAeq in dB(A). Si consiglia di verificare sempre il testo vigente e le norme di misura applicabili.'),
+      sezione('LIMITI PER CATEGORIA DI EDIFICIO'),
+      Table(
+        border: TableBorder.all(color: cLine, borderRadius: BorderRadius.circular(12)),
+        columnWidths: const {0: FlexColumnWidth(2.3)},
+        defaultColumnWidth: const FlexColumnWidth(1),
+        children: righe,
       ),
-      const SizedBox(height: 10),
-      InfoBox("Categoria $cat: R'w ≥ ${lim[0]}, D2m,nT,w ≥ ${lim[1]}, L'n,w ≤ ${lim[2]}, LASmax ≤ ${lim[3]} dB(A), LAeq ≤ ${lim[4]} dB(A)."),
-      for (var i = 0; i < 5; i++) Field(c: cs[i], label: nomi[i], suffix: unita[i], info: const ['Rw', 'D2m', 'Ln', 'LASmaxImp', 'LAeqImp'][i], fonte: i == 3 ? Fonte.lasMax : (i == 4 ? Fonte.laeq : null), onChanged: up),
-      ...esiti,
+      const SizedBox(height: 6),
+      const Text('≥ il valore misurato deve essere maggiore o uguale; ≤ minore o uguale.', style: TextStyle(fontSize: 12, color: cDark)),
+      sezione('COSA SIGNIFICANO GLI INDICI'),
+      for (final k in ['Rw', 'D2m', 'Ln', 'LASmaxImp', 'LAeqImp', 'categoria'])
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: cLine)),
+          child: ExpansionTile(
+            shape: const Border(),
+            collapsedShape: const Border(),
+            title: Text(glossario[k]!.titolo, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: cInk)),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
+            children: [Text(glossario[k]!.testo, style: const TextStyle(fontSize: 14, height: 1.4, color: cInk))],
+          ),
+        ),
     ]);
   }
 }

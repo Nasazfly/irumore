@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'glossario.dart';
+import 'schemi.dart';
 
 const cTeal = Color(0xFF0F6F61);
 const cDark = Color(0xFF0A4A41);
@@ -12,12 +13,13 @@ const cWarn = Color(0xFFB45309);
 const cOk = Color(0xFF1B7F4B);
 const cBad = Color(0xFFB3261E);
 
-enum Fonte { laeq, lasMax, lasMin }
+enum Fonte { laeq, lasMax, lasMin, distanza }
 
 /// Ultima misura del fonometro del telefono, disponibile per le altre funzioni.
 class UltimaMisura {
   static final i = UltimaMisura();
   double laeq = double.nan, lasMax = double.nan, lasMin = double.nan;
+  double distanza = double.nan; // distanza misurata sulla mappa (m)
   int secondi = 0;
   DateTime? quando;
   bool get valida => !laeq.isNaN && secondi >= 3;
@@ -77,6 +79,7 @@ void showInfo(BuildContext context, String key) {
             Text(v.titolo, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: cInk)),
             const SizedBox(height: 10),
             Text(v.testo, style: const TextStyle(fontSize: 15.5, height: 1.45, color: cInk)),
+            if (key == 'Q') const QSchemi(),
             const SizedBox(height: 14),
             Align(alignment: Alignment.centerRight, child: FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Capito'))),
           ],
@@ -123,7 +126,12 @@ class Field extends StatelessWidget {
     final um = UltimaMisura.i;
     double? val;
     var nome = '';
-    if (fonte != null && um.valida) {
+    if (fonte == Fonte.distanza) {
+      if (!um.distanza.isNaN) {
+        val = um.distanza;
+        nome = 'distanza';
+      }
+    } else if (fonte != null && um.valida) {
       if (fonte == Fonte.laeq) {
         val = um.laeq;
         nome = 'LAeq';
@@ -161,7 +169,7 @@ class Field extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6),
               child: ActionChip(
                 avatar: const Icon(Icons.phone_android, size: 18, color: cTeal),
-                label: Text('Usa dato del fonometro del telefono: $nome ${f1(usa)} dB'),
+                label: Text(fonte == Fonte.distanza ? 'Usa distanza misurata sulla mappa: ${f1(usa)} m' : 'Usa dato del fonometro del telefono: $nome ${f1(usa)} dB'),
                 onPressed: () {
                   c.text = f1(usa);
                   onChanged();
@@ -259,3 +267,31 @@ Widget sezione(String t) => Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 8),
       child: Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cDark, letterSpacing: 0.4)),
     );
+
+class Apribile extends StatelessWidget {
+  final String titolo;
+  final IconData icona;
+  final Widget child;
+  final bool aperto;
+  const Apribile({super.key, required this.titolo, required this.icona, required this.child, this.aperto = false});
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: cLine)),
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            initiallyExpanded: aperto,
+            maintainState: true,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
+            leading: Icon(icona, color: cTeal),
+            title: Text(titolo, style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, color: cInk)),
+            children: [child],
+          ),
+        ),
+      );
+}
