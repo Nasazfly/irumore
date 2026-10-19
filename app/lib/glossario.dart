@@ -8,6 +8,13 @@ const glossario = <String, Voce>{
   'LAeq': Voce('LAeq · livello continuo equivalente', "È il livello costante, in dB(A), che nello stesso intervallo di tempo trasporterebbe la stessa energia sonora del rumore reale, che invece varia. Non è una media aritmetica dei valori letti: i momenti più rumorosi pesano di più. È il parametro con cui si confrontano di norma i limiti. Nell'app è calcolato dall'avvio (o dall'ultimo Reset) fino a ora."),
   'LAF': Voce('LAF · livello istantaneo (Fast)', "Come il LAS, ma con costante di tempo Fast (125 ms): segue più rapidamente le variazioni del rumore ed è quindi più nervoso. Utile per vedere i picchi o per confrontarsi con un fonometro impostato in Fast."),
   'LAeq1s': Voce('LAeq,1s · finestra mobile di 1 secondo', "Livello equivalente calcolato sugli ultimi 1000 millisecondi (media energetica), aggiornato di continuo. Diversamente dal Slow non ha memoria esponenziale: dopo 1 secondo da un cambiamento il valore riflette interamente il nuovo livello. Va confrontato con il LAeq,1s del fonometro professionale."),
+  'LAFmax': Voce('LAFmax · massimo Fast', "Il valore più alto raggiunto dal LAF (curva A, Fast 125 ms) dall'avvio, controllato ogni 10 millisecondi. Con la costante Fast i picchi brevi emergono di più rispetto al Slow."),
+  'LAFmin': Voce('LAFmin · minimo Fast', "Il valore più basso raggiunto dal LAF (curva A, Fast 125 ms) dall'avvio."),
+  'LAeq1sMax': Voce('LAeq,1s max', "Il valore più alto del LAeq calcolato sulla finestra mobile di 1 secondo, controllato ogni 100 millisecondi, dall'avvio."),
+  'LAeq1sMin': Voce('LAeq,1s min', "Il valore più basso del LAeq calcolato sulla finestra mobile di 1 secondo, controllato ogni 100 millisecondi, dall'avvio."),
+  'spettro': Voce("Analisi in terzi d'ottava", "Scompone il rumore in 28 bande di frequenza larghe un terzo d'ottava, da 25 Hz a 12,5 kHz. Mostra quali frequenze dominano (per esempio basse frequenze o componenti tonali). Su un microfono di telefono i livelli per banda sono meno attendibili del livello globale: sotto circa 100 Hz e sopra circa 10 kHz in particolare. Si consiglia di confrontarli con il fonometro professionale e di usare le correzioni per banda."),
+  'corrBanda': Voce('Correzione per banda', "Correzione in dB aggiunta a una singola banda per compensare la risposta non piatta del microfono del telefono. Si ricava confrontando i livelli per banda del telefono con quelli del fonometro professionale su un rumore stazionario a spettro ampio (per esempio rumore rosa): correzione = livello del professionale meno livello del telefono."),
+  'primoFronte': Voce('Ricettori di primo fronte', "Edifici da cui il punto A (la sorgente) è visibile direttamente, senza altri edifici in mezzo: sono quelli che ricevono il rumore in modo diretto. Il calcolo usa le sagome degli edifici di OpenStreetMap lungo la linea di vista; non considera terreno, vegetazione, muri o edifici mancanti nei dati. Si consiglia di verificarlo sul posto."),
   'LASmax': Voce('LASmax · massimo', "Il valore più alto raggiunto dal LAS (curva A, Slow) durante la misura. Serve, per esempio, per valutare il rumore di impianti a funzionamento discontinuo come un ascensore o uno scarico."),
   'LASmin': Voce('LASmin · minimo', "Il valore più basso del LAS durante la misura. Dà un'idea del rumore nei momenti più silenziosi, ma non sostituisce la misura del rumore residuo."),
   'dBA': Voce('dB(A) · ponderazione A', "Decibel misurati con la curva di ponderazione A, che attenua le frequenze molto basse e molto alte per avvicinarsi a come le percepisce l'orecchio umano. È la scala usata per i limiti di rumore ambientale."),
@@ -52,7 +59,7 @@ const glossario = <String, Voce>{
 };
 
 const gruppiGlossario = <String, List<String>>{
-  'Fonometro': ['LAS', 'LAF', 'LAeq1s', 'LAeq', 'LASmax', 'LASmin', 'dBA', 'offset'],
+  'Fonometro': ['LAS', 'LAF', 'LAeq1s', 'LAeq', 'LASmax', 'LASmin', 'LAFmax', 'LAFmin', 'LAeq1sMax', 'LAeq1sMin', 'spettro', 'corrBanda', 'dBA', 'offset'],
   'Limiti e differenziale': ['immissione', 'emissione', 'classe', 'periodo', 'LA', 'LR', 'LS', 'dL', 'soglia', 'condizioni', 'esclusioni'],
   'Calcoli in decibel': ['Lsorg', 'Ltot', 'fondo', 'L1', 'd1', 'Lt', 'puntiforme', 'Lp', 'Lw', 'r', 'Q', 'Li', 'ti'],
   'Riverberazione': ['dim', 'mat', 'Sup', 'alfa', 'T60'],

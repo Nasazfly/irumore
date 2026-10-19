@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'glossario.dart';
 import 'schemi.dart';
 
+const kVersione = '7.0';
+
+const appVersion = '7.0';
+
 const cTeal = Color(0xFF0F6F61);
 const cDark = Color(0xFF0A4A41);
 const cInk = Color(0xFF10231F);
@@ -273,7 +277,8 @@ class Apribile extends StatelessWidget {
   final IconData icona;
   final Widget child;
   final bool aperto;
-  const Apribile({super.key, required this.titolo, required this.icona, required this.child, this.aperto = false});
+  final ValueChanged<bool>? onChange;
+  const Apribile({super.key, required this.titolo, required this.icona, required this.child, this.aperto = false, this.onChange});
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -282,6 +287,7 @@ class Apribile extends StatelessWidget {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             initiallyExpanded: aperto,
+            onExpansionChanged: onChange,
             maintainState: true,
             shape: const Border(),
             collapsedShape: const Border(),
@@ -294,4 +300,40 @@ class Apribile extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Avviso obbligatorio per le funzioni di misura con il microfono dello smartphone.
+Future<bool> mostraAvviso(BuildContext context) async {
+  var ok = false;
+  final r = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => StatefulBuilder(
+      builder: (ctx, ss) => AlertDialog(
+        title: const Text('Misura indicativa'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('La misura eseguita con il microfono dello smartphone non è conforme alla norma IEC 61672 (non è uno strumento di classe 1 o 2) e non è tarata da un laboratorio accreditato.\n\nI valori sono indicativi e NON sono utilizzabili in relazioni tecniche ufficiali, perizie o contenziosi legali.'),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: ok,
+                onChanged: (v) => ss(() => ok = v ?? false),
+                title: const Text('Ho letto e sono consapevole che la misura non è a norma e non è valida per relazioni o contenziosi.', style: TextStyle(fontSize: 13.5)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Esci')),
+          FilledButton(onPressed: ok ? () => Navigator.pop(ctx, true) : null, child: const Text('Continua')),
+        ],
+      ),
+    ),
+  );
+  return r == true;
 }

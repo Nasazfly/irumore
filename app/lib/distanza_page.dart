@@ -16,13 +16,82 @@ double distM(LatLng a, LatLng b) {
   return 2 * r * asin(min(1.0, sqrt(h)));
 }
 
-class _Ed {
-  final LatLng p;
-  final String tipo;
-  _Ed(this.p, this.tipo);
+// ───────── Geometria locale (metri, origine nel punto A) ─────────
+class _Pol {
+  final List<double> x, y;
+  final List<LatLng> ll;
+  late double minX, maxX, minY, maxY, dMin;
+  bool contieneA = false, primo = false;
+  _Pol(this.x, this.y, this.ll) {
+    minX = x.reduce(min);
+    maxX = x.reduce(max);
+    minY = y.reduce(min);
+    maxY = y.reduce(max);
+  }
+  double get area {
+    var s = 0.0;
+    for (var i = 0; i < x.length; i++) {
+      final j = (i + 1) % x.length;
+      s += x[i] * y[j] - x[j] * y[i];
+    }
+    return s.abs() / 2;
+  }
+
+  LatLng get centro => LatLng(ll.map((p) => p.latitude).reduce((a, b) => a + b) / ll.length, ll.map((p) => p.longitude).reduce((a, b) => a + b) / ll.length);
 }
 
-const _abitativi = {'house', 'residential', 'apartments', 'detached', 'semidetached_house', 'terrace', 'bungalow', 'dormitory', 'farm'};
+double _ptSeg(double px, double py, double ax, double ay, double bx, double by) {
+  final dx = bx - ax, dy = by - ay;
+  final l2 = dx * dx + dy * dy;
+  var t = l2 == 0 ? 0.0 : ((px - ax) * dx + (py - ay) * dy) / l2;
+  t = t.clamp(0.0, 1.0);
+  final cx = ax + t * dx, cy = ay + t * dy;
+  return sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+}
+
+bool _inside(double px, double py, _Pol p) {
+  var in_ = false;
+  for (var i = 0, j = p.x.length - 1; i < p.x.length; j = i++) {
+    if (((p.y[i] > py) != (p.y[j] > py)) && (px < (p.x[j] - p.x[i]) * (py - p.y[i]) / (p.y[j] - p.y[i]) + p.x[i])) in_ = !in_;
+  }
+  return in_;
+}
+
+double _orient(double ax, double ay, double bx, double by, double cx, double cy) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+
+bool _onSeg(double ax, double ay, double bx, double by, double px, double py) =>
+    px >= min(ax, bx) - 1e-9 && px <= max(ax, bx) + 1e-9 && py >= min(ay, by) - 1e-9 && py <= max(ay, by) + 1e-9;
+
+// Intersezione tra segmenti, compresi i contatti e i tratti sovrapposti.
+bool _cross(double ax, double ay, double bx, double by, double cx, double cy, double dx, double dy) {
+  const e = 1e-6;
+  final o1 = _orient(ax, ay, bx, by, cx, cy), o2 = _orient(ax, ay, bx, by, dx, dy);
+  final o3 = _orient(cx, cy, dx, dy, ax, ay), o4 = _orient(cx, cy, dx, dy, bx, by);
+  if (((o1 > e && o2 < -e) || (o1 < -e && o2 > e)) && ((o3 > e && o4 < -e) || (o3 < -e && o4 > e))) return true;
+  if (o1.abs() <= e && _onSeg(ax, ay, bx, by, cx, cy)) return true;
+  if (o2.abs() <= e && _onSeg(ax, ay, bx, by, dx, dy)) return true;
+  if (o3.abs() <= e && _onSeg(cx, cy, dx, dy, ax, ay)) return true;
+  if (o4.abs() <= e && _onSeg(cx, cy, dx, dy, bx, by)) return true;
+  return false;
+}
+
+// Il segmento dal punto A (0,0) al punto (px,py) è schermato da un altro edificio?
+// Il tratto finale di 0,5 m è escluso, per non contare le pareti in comune tra edifici adiacenti.
+bool _schermato(double px0, double py0, _Pol self, List<_Pol> blockers) {
+  final len = sqrt(px0 * px0 + py0 * py0);
+  final f = len > 1.0 ? (len - 0.5) / len : 1.0;
+  final px = px0 * f, py = py0 * f;
+  final sMinX = min(0.0, px), sMaxX = max(0.0, px), sMinY = min(0.0, py), sMaxY = max(0.0, py);
+  for (final q in blockers) {
+    if (identical(q, self)) continue;
+    if (q.maxX < sMinX || q.minX > sMaxX || q.maxY < sMinY || q.minY > sMaxY) continue;
+    for (var i = 0; i < q.x.length; i++) {
+      final j = (i + 1) % q.x.length;
+      if (_cross(0, 0, px, py, q.x[i], q.y[i], q.x[j], q.y[j])) return true;
+    }
+  }
+  return false;
+}
 
 class DistanzaPage extends StatefulWidget {
   const DistanzaPage({super.key});
@@ -37,8 +106,11 @@ class _DistState extends State<DistanzaPage> {
   LatLng? me, origin, b;
   int modo = 0;
   double raggio = 100;
+  bool aerea = false;
   final ric = <LatLng>[];
-  List<_Ed> edifici = [];
+  List<_Pol> primi = [];
+  List<_Pol> altri = [];
+  int totEdifici = 0;
   double? raggioEd;
   bool cerco = false;
   String? err, nota;
@@ -85,7 +157,7 @@ class _DistState extends State<DistanzaPage> {
     }
   }
 
-  Future<void> contaEdifici() async {
+  Future<void> contaPrimoFronte() async {
     final c = a;
     if (c == null) {
       setState(() => nota = 'Serve un punto A: attendi il GPS o tieni premuto sulla mappa.');
@@ -97,21 +169,68 @@ class _DistState extends State<DistanzaPage> {
     });
     try {
       final rr = raggio.round();
-      final q = '[out:json][timeout:25];(way["building"](around:$rr,${c.latitude},${c.longitude});relation["building"](around:$rr,${c.latitude},${c.longitude}););out center tags;';
+      final q = '[out:json][timeout:25];way["building"](around:$rr,${c.latitude},${c.longitude});out geom;';
       final r = await http
-          .post(Uri.parse('https://overpass-api.de/api/interpreter'), headers: {'User-Agent': 'EnviNoise/0.6 (Studio Agfor)'}, body: {'data': q})
+          .post(Uri.parse('https://overpass-api.de/api/interpreter'), headers: {'User-Agent': 'EnviNoise/7.0 (Studio Agfor)'}, body: {'data': q})
           .timeout(const Duration(seconds: 40));
       if (r.statusCode != 200) throw 'Servizio OpenStreetMap non disponibile (${r.statusCode}). Riprova tra poco.';
       final j = jsonDecode(utf8.decode(r.bodyBytes));
-      final out = <_Ed>[];
+      final kx = cos(c.latitude * pi / 180) * 111320.0, ky = 110540.0;
+      final pols = <_Pol>[];
       for (final e in (j['elements'] as List)) {
-        final cen = e['center'];
-        if (cen == null) continue;
-        final tags = (e['tags'] as Map?) ?? {};
-        out.add(_Ed(LatLng((cen['lat'] as num).toDouble(), (cen['lon'] as num).toDouble()), '${tags['building'] ?? 'yes'}'));
+        final g = e['geometry'];
+        if (g == null) continue;
+        final ll = <LatLng>[];
+        final xs = <double>[], ys = <double>[];
+        for (final p in (g as List)) {
+          final la = (p['lat'] as num).toDouble(), lo = (p['lon'] as num).toDouble();
+          ll.add(LatLng(la, lo));
+          xs.add((lo - c.longitude) * kx);
+          ys.add((la - c.latitude) * ky);
+        }
+        if (ll.length > 1 && ll.first.latitude == ll.last.latitude && ll.first.longitude == ll.last.longitude) {
+          ll.removeLast();
+          xs.removeLast();
+          ys.removeLast();
+        }
+        if (ll.length < 3) continue;
+        final p = _Pol(xs, ys, ll);
+        if (p.area < 10) continue; // manufatti molto piccoli
+        pols.add(p);
+      }
+      if (pols.length > 1500) throw 'Troppi edifici nel raggio (${pols.length}): riduci il raggio.';
+      await Future.delayed(const Duration(milliseconds: 30));
+      for (final p in pols) {
+        p.contieneA = _inside(0, 0, p);
+        var d = double.infinity;
+        for (var i = 0; i < p.x.length; i++) {
+          final k = (i + 1) % p.x.length;
+          d = min(d, _ptSeg(0, 0, p.x[i], p.y[i], p.x[k], p.y[k]));
+        }
+        p.dMin = p.contieneA ? 0 : d;
+      }
+      final blockers = pols.where((p) => !p.contieneA).toList()..sort((u, v) => u.dMin.compareTo(v.dMin));
+      for (final p in blockers) {
+        if (p.dMin > raggio) continue;
+        final stride = max(1, p.x.length ~/ 12);
+        final cand = <List<double>>[];
+        for (var i = 0; i < p.x.length; i += stride) {
+          final k = (i + 1) % p.x.length;
+          cand.add([p.x[i], p.y[i]]);
+          cand.add([(p.x[i] + p.x[k]) / 2, (p.y[i] + p.y[k]) / 2]);
+        }
+        cand.sort((u, v) => (u[0] * u[0] + u[1] * u[1]).compareTo(v[0] * v[0] + v[1] * v[1]));
+        for (final s in cand) {
+          if (!_schermato(s[0], s[1], p, blockers)) {
+            p.primo = true;
+            break;
+          }
+        }
       }
       setState(() {
-        edifici = out;
+        primi = blockers.where((p) => p.primo).toList();
+        altri = blockers.where((p) => !p.primo && p.dMin <= raggio).toList();
+        totEdifici = blockers.where((p) => p.dMin <= raggio).length;
         raggioEd = raggio;
       });
     } catch (e) {
@@ -139,15 +258,19 @@ class _DistState extends State<DistanzaPage> {
       if (origin != null) pin(origin!, 'A', const Color(0xFF1F6FB2)),
       if (modo == 0 && b != null) pin(b!, 'B', const Color(0xFFE8704A)),
       if (modo == 1)
-        for (var i = 0; i < ric.length; i++) pin(ric[i], '${i + 1}', const Color(0xFFB4492A)),
+        for (var i = 0; i < ric.length; i++) pin(ric[i], 'R${i + 1}', const Color(0xFFB4492A)),
+      if (modo == 1)
+        for (var i = 0; i < primi.length && i < 12; i++) pin(primi[i].centro, '${i + 1}', const Color(0xFFE8704A)),
     ];
     final cerchi = <CircleMarker>[
       if (me != null) CircleMarker(point: me!, radius: 8, color: const Color(0xFF1F6FB2), borderColor: Colors.white, borderStrokeWidth: 3),
-      if (modo == 1 && pa != null)
-        CircleMarker(point: pa, radius: raggio, useRadiusInMeter: true, color: const Color(0x33E8704A), borderColor: const Color(0xFFE8704A), borderStrokeWidth: 2),
+      if (modo == 1 && pa != null) CircleMarker(point: pa, radius: raggio, useRadiusInMeter: true, color: const Color(0x22E8704A), borderColor: const Color(0xFFE8704A), borderStrokeWidth: 2),
+    ];
+    final poligoni = <Polygon>[
       if (modo == 1)
-        for (final e in edifici.take(600))
-          CircleMarker(point: e.p, radius: 4.5, color: _abitativi.contains(e.tipo) ? const Color(0xFFE8704A) : const Color(0xFF0F6F61), borderColor: Colors.white, borderStrokeWidth: 1),
+        for (final p in altri.take(400)) Polygon(points: p.ll, color: const Color(0x00000000), borderColor: const Color(0xAA8A9A96), borderStrokeWidth: 1),
+      if (modo == 1)
+        for (final p in primi) Polygon(points: p.ll, color: const Color(0x88E8704A), borderColor: const Color(0xFFB4492A), borderStrokeWidth: 2),
     ];
     return Scaffold(
       backgroundColor: cBg,
@@ -157,6 +280,16 @@ class _DistState extends State<DistanzaPage> {
         foregroundColor: cInk,
         elevation: 0,
         scrolledUnderElevation: 0,
+        actions: [
+          PopupMenuButton<bool>(
+            icon: const Icon(Icons.layers),
+            onSelected: (v) => setState(() => aerea = v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: false, child: Text('Mappa OpenStreetMap')),
+              PopupMenuItem(value: true, child: Text('Foto aerea (2009-2012)')),
+            ],
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -167,7 +300,7 @@ class _DistState extends State<DistanzaPage> {
                 width: double.infinity,
                 child: SegmentedButton<int>(
                   showSelectedIcon: false,
-                  segments: const [ButtonSegment(value: 0, label: Text('Distanza A-B')), ButtonSegment(value: 1, label: Text('Raggio ed edifici'))],
+                  segments: const [ButtonSegment(value: 0, label: Text('Distanza A-B')), ButtonSegment(value: 1, label: Text('Raggio e primo fronte'))],
                   selected: {modo},
                   onSelectionChanged: (s) => setState(() => modo = s.first),
                 ),
@@ -198,15 +331,31 @@ class _DistState extends State<DistanzaPage> {
                   onLongPress: (tp, p) => setState(() => origin = p),
                 ),
                 children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'it.studioagfor.irumore',
-                    maxNativeZoom: 19,
-                  ),
+                  if (aerea)
+                    TileLayer(
+                      wmsOptions: WMSTileLayerOptions(
+                        baseUrl: 'http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map&',
+                        layers: const ['OI.ORTOIMMAGINI.2012'],
+                        format: 'image/jpeg',
+                        transparent: false,
+                      ),
+                      userAgentPackageName: 'it.studioagfor.irumore',
+                      maxNativeZoom: 19,
+                    )
+                  else
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'it.studioagfor.irumore',
+                      maxNativeZoom: 19,
+                    ),
                   if (modo == 0 && pa != null && b != null) PolylineLayer(polylines: [Polyline(points: [pa, b!], color: const Color(0xFFE8704A), strokeWidth: 4)]),
+                  PolygonLayer(polygons: poligoni),
                   CircleLayer(circles: cerchi),
                   MarkerLayer(markers: markers),
-                  const RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
+                  RichAttributionWidget(attributions: [
+                    const TextSourceAttribution('© OpenStreetMap contributors'),
+                    if (aerea) const TextSourceAttribution('Ortofoto AGEA 2009-2012: Geoportale Nazionale (MASE)'),
+                  ]),
                 ],
               ),
             ),
@@ -222,7 +371,7 @@ class _DistState extends State<DistanzaPage> {
                     if (origin != null)
                       TextButton.icon(onPressed: () => setState(() => origin = null), icon: const Icon(Icons.my_location, size: 18), label: const Text('Punto A = la mia posizione')),
                     const Text(
-                      'Precisione indicativa: il GPS di un telefono ha di norma un errore di alcuni metri. Tocca la mappa per il punto B (o per aggiungere un ricettore); tieni premuto per spostare il punto A.',
+                      'Precisione indicativa: il GPS di un telefono ha di norma un errore di alcuni metri. Tocca la mappa per il punto B (o per aggiungere un ricettore); tieni premuto per spostare il punto A, per esempio sulla sorgente.',
                       style: TextStyle(fontSize: 11.5, color: cDark, height: 1.3),
                     ),
                   ],
@@ -254,23 +403,33 @@ class _DistState extends State<DistanzaPage> {
   }
 
   List<Widget> _pannelloRaggio(LatLng? pa, int dentro) {
-    final res = edifici.where((e) => _abitativi.contains(e.tipo)).length;
-    final vicini = [...edifici]..sort((x, y) => distM(pa ?? x.p, x.p).compareTo(distM(pa ?? y.p, y.p)));
     return [
       Text('Raggio: ${f1(raggio, 0)} m', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cInk)),
       Slider(min: 10, max: 1000, divisions: 99, value: raggio.clamp(10.0, 1000.0), label: '${f1(raggio, 0)} m', onChanged: (v) => setState(() => raggio = v)),
       if (pa == null) const InfoBox('In attesa della posizione GPS: il cerchio è centrato sul punto A.'),
       FilledButton.icon(
-        onPressed: cerco ? null : contaEdifici,
+        onPressed: cerco ? null : contaPrimoFronte,
         icon: cerco ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.home_work),
-        label: Text(cerco ? 'Cerco gli edifici...' : 'Conta gli edifici nel raggio (OpenStreetMap)'),
+        label: Text(cerco ? 'Calcolo in corso...' : 'Conta i ricettori di primo fronte'),
       ),
-      if (nota != null) Padding(padding: const EdgeInsets.only(top: 8), child: InfoBox(nota!, color: cBad, icon: Icons.warning_amber)),
-      if (edifici.isNotEmpty && raggioEd != null) ...[
-        const SizedBox(height: 8),
-        Esito('Edifici nel raggio di ${f1(raggioEd!, 0)} m', '${edifici.length} edifici, di cui $res con destinazione residenziale nei dati OpenStreetMap (arancione); gli altri o senza destinazione specificata sono in verde. La completezza dei dati varia da zona a zona: si consiglia di verificare sul posto.', true),
-        for (final e in vicini.take(5))
-          Text('${_abitativi.contains(e.tipo) ? 'Residenziale' : (e.tipo == 'yes' ? 'Edificio' : e.tipo)} · ${f1(distM(pa ?? e.p, e.p), 0)} m dal punto A', style: const TextStyle(fontSize: 13, color: cInk)),
+      Align(alignment: Alignment.centerLeft, child: TextButton.icon(onPressed: () => showInfo(context, 'primoFronte'), icon: const Icon(Icons.info_outline, size: 18), label: const Text('Cosa significa primo fronte'))),
+      if (nota != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: InfoBox(nota!, color: cBad, icon: Icons.warning_amber)),
+      if (raggioEd != null) ...[
+        Esito('Ricettori di primo fronte', '${primi.length} edifici affacciati direttamente sul punto A, su $totEdifici edifici nel raggio di ${f1(raggioEd!, 0)} m (sagome OpenStreetMap). Gli altri edifici sono schermati e non vengono conteggiati.', true),
+        for (var i = 0; i < primi.length && i < 10; i++)
+          Text('R${i + 1} · facciata più vicina a ${f1(primi[i].dMin, 0)} m dal punto A', style: const TextStyle(fontSize: 13, color: cInk)),
+        if (primi.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: FilledButton.tonalIcon(
+              onPressed: () {
+                UltimaMisura.i.distanza = primi.first.dMin;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Distanza ${f1(primi.first.dMin, 0)} m (ricettore più vicino) disponibile nei calcoli di propagazione.')));
+              },
+              icon: const Icon(Icons.send),
+              label: const Text('Usa la distanza del più vicino nei calcoli'),
+            ),
+          ),
         const SizedBox(height: 8),
       ],
       if (ric.isNotEmpty) ...[
@@ -281,9 +440,11 @@ class _DistState extends State<DistanzaPage> {
       Row(children: [
         TextButton.icon(onPressed: ric.isEmpty ? null : () => setState(() => ric.removeLast()), icon: const Icon(Icons.undo, size: 18), label: const Text('Rimuovi ultimo')),
         TextButton.icon(
-          onPressed: (ric.isEmpty && edifici.isEmpty) ? null : () => setState(() {
+          onPressed: (ric.isEmpty && primi.isEmpty) ? null : () => setState(() {
                 ric.clear();
-                edifici = [];
+                primi = [];
+                altri = [];
+                raggioEd = null;
               }),
           icon: const Icon(Icons.delete_outline, size: 18),
           label: const Text('Azzera'),

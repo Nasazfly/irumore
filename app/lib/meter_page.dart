@@ -20,6 +20,8 @@ String stamp(DateTime d) {
   return '${t(d.day)}/${t(d.month)}/${d.year} ${t(d.hour)}:${t(d.minute)}';
 }
 
+String segno(double v) => v >= 0 ? '+' : '';
+
 class MeterPage extends StatefulWidget {
   const MeterPage({super.key});
   @override
@@ -36,11 +38,36 @@ class _MeterPageState extends State<MeterPage> {
   String? err;
   String? nota;
   double off = 0;
+  String? offDate; // data in cui è stata impostata la taratura
   int modo = 0; // 0 Slow, 1 Fast, 2 LAeq 1 s
   DateTime t0 = DateTime.now();
 
+  static const etichette = ['LAS · ponderazione A · Slow', 'LAF · ponderazione A · Fast', 'LAeq,1s · finestra mobile di 1 s'];
+  static const chiavi = ['LAS', 'LAF', 'LAeq1s'];
+  static const nMax = ['LASmax', 'LAFmax', 'LAeq,1s max'];
+  static const nMin = ['LASmin', 'LAFmin', 'LAeq,1s min'];
+  static const kMax = ['LASmax', 'LAFmax', 'LAeq1sMax'];
+  static const kMin = ['LASmin', 'LAFmin', 'LAeq1sMin'];
+
+  @override
+  void initState() {
+    super.initState();
+    carica();
+  }
+
+  Future<void> carica() async {
+    final p = await SharedPreferences.getInstance();
+    off = p.getDouble('offset') ?? 0;
+    offDate = p.getString('offset_date');
+    if (mounted) setState(() {});
+    if (mounted) await avviso();
+  }
+
   Future<void> avviso() async {
     var ok = false;
+    final tar = offDate == null
+        ? 'Nessuna taratura memorizzata: i valori non sono attendibili finché non tari il telefono con il tuo fonometro.'
+        : 'Taratura memorizzata: ${segno(off)}${f1(off)} dB (impostata il $offDate).';
     final r = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -53,6 +80,12 @@ class _MeterPageState extends State<MeterPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('La misura eseguita con il microfono dello smartphone non è conforme alla norma IEC 61672 (non è uno strumento di classe 1 o 2) e non è tarata da un laboratorio accreditato.\n\nI valori sono indicativi e NON sono utilizzabili in relazioni tecniche ufficiali, perizie o contenziosi legali.'),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: cMint, borderRadius: BorderRadius.circular(10)),
+                  child: Text(tar, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cInk)),
+                ),
                 const SizedBox(height: 8),
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
@@ -72,15 +105,6 @@ class _MeterPageState extends State<MeterPage> {
       ),
     );
     if (r != true && mounted) Navigator.pop(context);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => avviso());
-    SharedPreferences.getInstance().then((p) {
-      if (mounted) setState(() => off = p.getDouble('offset') ?? 0);
-    });
   }
 
   void snap() {
@@ -128,10 +152,9 @@ class _MeterPageState extends State<MeterPage> {
       sub = st.listen(m.process);
       WakelockPlus.enable();
       tick = Timer.periodic(const Duration(milliseconds: 250), (_) {
-        if (mounted) {
-          snap();
-          setState(() {});
-        }
+        if (!mounted) return;
+        snap();
+        setState(() {});
       });
       setState(() => running = true);
     } catch (e) {
@@ -159,10 +182,15 @@ class _MeterPageState extends State<MeterPage> {
 
   Future<void> setOff(double v) async {
     final x = (v.clamp(-60.0, 60.0) * 10).round() / 10;
-    setState(() => off = x);
+    final data = stamp(DateTime.now()).substring(0, 10);
+    setState(() {
+      off = x;
+      offDate = data;
+    });
     snap();
     final p = await SharedPreferences.getInstance();
     await p.setDouble('offset', x);
+    await p.setString('offset_date', data);
   }
 
   void taratura() {
@@ -190,20 +218,20 @@ class _MeterPageState extends State<MeterPage> {
                     InfoDot('offset'),
                   ]),
                   const SizedBox(height: 8),
-                  Center(child: Text('${off >= 0 ? '+' : ''}${f1(off)} dB', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w700, color: cTeal))),
+                  Center(child: Text('${segno(off)}${f1(off)} dB', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w700, color: cTeal))),
+                  Center(child: Text(offDate == null ? 'Nessuna taratura memorizzata' : 'Memorizzata, impostata il $offDate', style: const TextStyle(fontSize: 13, color: cDark))),
                   Slider(min: -60, max: 60, divisions: 1200, value: off, onChanged: set),
                   Wrap(
                     alignment: WrapAlignment.center,
                     spacing: 8,
                     children: [
-                      for (final d in [-1.0, -0.1, 0.1, 1.0])
-                        OutlinedButton(onPressed: () => set(off + d), child: Text(d > 0 ? '+${f1(d)}' : f1(d))),
+                      for (final d in [-1.0, -0.1, 0.1, 1.0]) OutlinedButton(onPressed: () => set(off + d), child: Text(d > 0 ? '+${f1(d)}' : f1(d))),
                       TextButton(onPressed: () => set(0), child: const Text('Azzera')),
                     ],
                   ),
                   const SizedBox(height: 12),
                   const InfoBox(
-                    'Accosta il telefono al microfono del fonometro professionale, con un rumore stazionario (per esempio una ventilazione). Regola l\'offset finché il LAS del telefono coincide con quello dello strumento. Si consiglia di verificare poi un secondo livello: se le letture divergono, il microfono non è lineare su tutta la dinamica. L\'offset vale per questo telefono, con questa posizione e senza custodia.',
+                    'La taratura resta memorizzata: alla prossima apertura l\'app userà lo stesso offset. Per tararla, accosta il telefono al microfono del fonometro professionale, con un rumore stazionario (per esempio una ventilazione), e regola l\'offset finché il LAS del telefono coincide con quello dello strumento. Si consiglia di verificare poi un secondo livello: se le letture divergono, il microfono non è lineare su tutta la dinamica. L\'offset vale per questo telefono, con questa posizione e senza custodia.',
                   ),
                 ],
               ),
@@ -222,7 +250,7 @@ class _MeterPageState extends State<MeterPage> {
       final img = await b.toImage(pixelRatio: 3);
       final bd = await img.toByteData(format: ui.ImageByteFormat.png);
       final dir = await getTemporaryDirectory();
-      final f = File('${dir.path}/hai_rumore_${DateTime.now().millisecondsSinceEpoch}.png');
+      final f = File('${dir.path}/envinoise_${DateTime.now().millisecondsSinceEpoch}.png');
       await f.writeAsBytes(bd!.buffer.asUint8List());
       await Share.shareXFiles([XFile(f.path)], text: 'EnviNoise - LAeq ${f1(m.laeq(off))} dB(A) in ${mmss(m.seconds)}');
     } catch (e) {
@@ -240,9 +268,9 @@ class _MeterPageState extends State<MeterPage> {
               GestureDetector(
                 onTap: () => showInfo(context, k),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(l, style: const TextStyle(color: cDark, fontSize: 12, fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.info_outline, size: 15, color: cTeal),
+                  Text(l, style: const TextStyle(color: cDark, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 3),
+                  const Icon(Icons.info_outline, size: 14, color: cTeal),
                 ]),
               ),
               const SizedBox(height: 2),
@@ -255,15 +283,18 @@ class _MeterPageState extends State<MeterPage> {
   @override
   Widget build(BuildContext context) {
     final big = modo == 0 ? m.lasNow(off) : (modo == 1 ? m.lafNow(off) : m.leq1s(off));
-    const etichette = ['LAS · ponderazione A · Slow', 'LAF · ponderazione A · Fast', 'LAeq,1s · finestra mobile di 1 s'];
-    const chiavi = ['LAS', 'LAF', 'LAeq1s'];
-    final fsE = m.fsEff;
     final leq = m.laeq(off);
-    final mx = m.lasMax(off);
-    final mn = m.lasMin(off);
-    final ser = m.series(off);
+    final mx = modo == 0 ? m.lasMax(off) : (modo == 1 ? m.lafMax(off) : m.leq1Max(off));
+    final mn = modo == 0 ? m.lasMin(off) : (modo == 1 ? m.lafMin(off) : m.leq1Min(off));
+    final ser = modo == 0 ? m.series(off) : (modo == 1 ? m.seriesF(off) : m.seriesL(off));
+    final fsE = m.fsEff;
     final rich = DiffState.i.richiesto(leq, m.seconds);
     final clip = m.lastClip != null && DateTime.now().difference(m.lastClip!).inSeconds < 3;
+    const didascalie = [
+      'LAS: livello ponderato A, costante Slow (1 s), campionato ogni secondo.',
+      'LAF: livello ponderato A, costante Fast (125 ms), campionato ogni secondo.',
+      'LAeq,1s: livello equivalente su finestra mobile di 1 s, campionato ogni secondo.',
+    ];
     return page('Fonometro', [
       Container(
         width: double.infinity,
@@ -276,7 +307,7 @@ class _MeterPageState extends State<MeterPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Text(etichette[modo], style: const TextStyle(color: Color(0xFFBFE3DC), fontSize: 13, fontWeight: FontWeight.w600)),
+                    Flexible(child: Text(etichette[modo], style: const TextStyle(color: Color(0xFFBFE3DC), fontSize: 13, fontWeight: FontWeight.w600))),
                     InfoDot(chiavi[modo], color: const Color(0xFFBFE3DC)),
                   ]),
                   Row(
@@ -309,10 +340,32 @@ class _MeterPageState extends State<MeterPage> {
           onSelectionChanged: (v) => setState(() => modo = v.first),
         ),
       ),
+      const SizedBox(height: 8),
+      InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: taratura,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: offDate == null ? const Color(0xFFFFF1E0) : cMint, borderRadius: BorderRadius.circular(14)),
+          child: Row(
+            children: [
+              Icon(Icons.tune, size: 20, color: offDate == null ? cWarn : cTeal),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  offDate == null ? 'Nessuna taratura (offset 0,0 dB): tocca per tarare il telefono.' : 'Taratura attiva: ${segno(off)}${f1(off)} dB · impostata il $offDate',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: offDate == null ? cWarn : cInk),
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: cDark),
+            ],
+          ),
+        ),
+      ),
       const SizedBox(height: 10),
       if (clip) const InfoBox('Saturazione del microfono: livello non attendibile. Si consiglia di allontanare il telefono dalla sorgente.', color: cBad, icon: Icons.warning_amber),
       if (rich == true) InfoBox('Il LAeq supera la soglia di applicabilità del differenziale (${f1(soglia(DiffState.i.notte, DiffState.i.aperte), 0)} dB(A)): verifica differenziale necessaria. Vedi il riquadro in fondo alla pagina.', color: cWarn, icon: Icons.rule),
-      Row(children: [stat('LAeq', f1(leq), 'LAeq'), stat('LASmax', f1(mx), 'LASmax'), stat('LASmin', f1(mn), 'LASmin')]),
+      Row(children: [stat('LAeq', f1(leq), 'LAeq'), stat(nMax[modo], f1(mx), kMax[modo]), stat(nMin[modo], f1(mn), kMin[modo])]),
       const SizedBox(height: 12),
       RepaintBoundary(
         key: gkey,
@@ -333,14 +386,14 @@ class _MeterPageState extends State<MeterPage> {
               const Text('Misura fonometrica indicativa', style: TextStyle(fontWeight: FontWeight.w700, color: cInk, fontSize: 15)),
               const SizedBox(height: 4),
               Text(
-                'LAeq ${f1(leq)} dB(A)  ·  LASmax ${f1(mx)}  ·  LASmin ${f1(mn)}  ·  durata ${mmss(m.seconds)}',
+                'LAeq ${f1(leq)} dB(A)  ·  ${nMax[modo]} ${f1(mx)}  ·  ${nMin[modo]} ${f1(mn)}  ·  durata ${mmss(m.seconds)}',
                 style: const TextStyle(color: cInk, fontSize: 13, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               SizedBox(height: 190, width: double.infinity, child: CustomPaint(painter: ChartPainter(ser, leq))),
               const SizedBox(height: 6),
               Text(
-                'LAS: livello ponderato A, costante Slow (1 s), campionato ogni secondo. Offset di taratura ${off >= 0 ? '+' : ''}${f1(off)} dB. Misura con microfono di smartphone: indicativa, non conforme alla IEC 61672.',
+                '${didascalie[modo]} Offset di taratura ${segno(off)}${f1(off)} dB${offDate == null ? '' : ' (impostato il $offDate)'}. Misura con microfono di smartphone: indicativa, non conforme alla IEC 61672.',
                 style: const TextStyle(color: cDark, fontSize: 10.5, height: 1.3),
               ),
             ],
@@ -372,30 +425,17 @@ class _MeterPageState extends State<MeterPage> {
         ],
       ),
       const SizedBox(height: 8),
-      Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-              onPressed: taratura,
-              icon: const Icon(Icons.tune),
-              label: Text('Taratura ${off >= 0 ? '+' : ''}${f1(off)} dB'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: FilledButton.tonalIcon(
-              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-              onPressed: m.seconds >= 2 ? condividi : null,
-              icon: const Icon(Icons.ios_share),
-              label: const Text('Condividi grafico'),
-            ),
-          ),
-        ],
+      SizedBox(
+        width: double.infinity,
+        child: FilledButton.tonalIcon(
+          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+          onPressed: m.seconds >= 2 ? condividi : null,
+          icon: const Icon(Icons.ios_share),
+          label: const Text('Condividi grafico'),
+        ),
       ),
       const SizedBox(height: 10),
       const InfoBox('I valori misurati si possono importare nelle altre funzioni con il pulsante "Usa dato del fonometro del telefono" accanto ai campi. Tutte le funzioni accettano anche dati scritti a mano.'),
-      const SizedBox(height: 4),
       if (fsE != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Campionamento effettivo: ${f1(fsE / 1000)} kHz (atteso 48,0)', style: const TextStyle(fontSize: 11.5, color: cDark))),
       if (fsE != null && (fsE - 48000).abs() / 48000 > 0.03)
         const InfoBox('La frequenza di campionamento effettiva differisce da quella attesa: i tempi di integrazione e la ponderazione A potrebbero risultare alterati su questo telefono. Si consiglia di confrontare con il fonometro professionale.', color: cWarn, icon: Icons.warning_amber),

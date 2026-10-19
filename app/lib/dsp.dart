@@ -14,6 +14,7 @@ class LevelMeter {
   static final double alpha = 1 - exp(-1 / (fs * 1.0)); // Slow: tau = 1 s
   static final double alphaF = 1 - exp(-1 / (fs * 0.125)); // Fast: tau = 125 ms
   static const binLen = fs ~/ 10; // finestra mobile LAeq 1 s = 10 blocchi da 100 ms
+  static const fineLen = 480; // controllo dei massimi/minimi Fast ogni 10 ms
 
   final _z1 = [0.0, 0.0, 0.0];
   final _z2 = [0.0, 0.0, 0.0];
@@ -28,8 +29,14 @@ class LevelMeter {
   final _bins = List<double>.filled(10, 0.0);
   int _binIdx = 0, _binFilled = 0, _binN = 0;
   double _binSum = 0;
-  final las = <double>[]; // LAS campionato ogni secondo (valori grezzi, senza offset)
-  double maxRaw = -1e9, minRaw = 1e9;
+  int _fineN = 0;
+  // serie campionate ogni secondo (valori grezzi, senza offset)
+  final las = <double>[];
+  final laf = <double>[];
+  final leq1 = <double>[];
+  double maxRaw = -1e9, minRaw = 1e9; // LASmax / LASmin
+  double fMaxRaw = -1e9, fMinRaw = 1e9; // LAFmax / LAFmin (controllo ogni 10 ms)
+  double l1MaxRaw = -1e9, l1MinRaw = 1e9; // LAeq,1s max / min (finestra mobile, ogni 100 ms)
   int clipCount = 0;
   DateTime? lastClip;
   DateTime? _t0;
@@ -56,9 +63,16 @@ class LevelMeter {
     _binFilled = 0;
     _binN = 0;
     _binSum = 0;
+    _fineN = 0;
     las.clear();
+    laf.clear();
+    leq1.clear();
     maxRaw = -1e9;
     minRaw = 1e9;
+    fMaxRaw = -1e9;
+    fMinRaw = 1e9;
+    l1MaxRaw = -1e9;
+    l1MinRaw = 1e9;
     clipCount = 0;
     lastClip = null;
     _t0 = null;
@@ -81,20 +95,31 @@ class LevelMeter {
 
   double lasNow(double off) => _init ? _db(slowP) + base + off : double.nan;
   double lafNow(double off) => _init ? _db(fastP) + base + off : double.nan;
-  double leq1s(double off) {
+  double _leq1Raw() {
     final cnt = _binFilled * binLen + _binN;
     if (!_init || cnt == 0) return double.nan;
     var s = _binSum;
     for (var i = 0; i < _binFilled; i++) {
       s += _bins[i];
     }
-    return _db(s / cnt) + base + off;
+    return _db(s / cnt);
+  }
+
+  double leq1s(double off) {
+    final v = _leq1Raw();
+    return v.isNaN ? v : v + base + off;
   }
 
   double laeq(double off) => n > 0 ? _db(sumSq / n) + base + off : double.nan;
   double lasMax(double off) => las.isEmpty ? double.nan : maxRaw + base + off;
   double lasMin(double off) => las.isEmpty ? double.nan : minRaw + base + off;
+  double lafMax(double off) => fMaxRaw < -1e8 ? double.nan : fMaxRaw + base + off;
+  double lafMin(double off) => fMinRaw > 1e8 ? double.nan : fMinRaw + base + off;
+  double leq1Max(double off) => l1MaxRaw < -1e8 ? double.nan : l1MaxRaw + base + off;
+  double leq1Min(double off) => l1MinRaw > 1e8 ? double.nan : l1MinRaw + base + off;
   List<double> series(double off) => [for (final v in las) v + base + off];
+  List<double> seriesF(double off) => [for (final v in laf) v + base + off];
+  List<double> seriesL(double off) => [for (final v in leq1) v + base + off];
 
   void process(Uint8List input) {
     var bytes = input;
@@ -153,16 +178,35 @@ class LevelMeter {
       secN++;
       _binSum += ev;
       _binN++;
+      _fineN++;
+      if (_fineN >= fineLen) {
+        _fineN = 0;
+        final lf = _db(fastP);
+        if (lf > fMaxRaw) fMaxRaw = lf;
+        if (lf < fMinRaw) fMinRaw = lf;
+      }
       if (_binN >= binLen) {
         _bins[_binIdx] = _binSum;
         _binIdx = (_binIdx + 1) % 10;
         if (_binFilled < 10) _binFilled++;
         _binSum = 0;
         _binN = 0;
+        if (_binFilled == 10) {
+          var s = 0.0;
+          for (final b in _bins) {
+            s += b;
+          }
+          final l1 = _db(s / (10 * binLen));
+          if (l1 > l1MaxRaw) l1MaxRaw = l1;
+          if (l1 < l1MinRaw) l1MinRaw = l1;
+        }
       }
       if (secN >= fs) {
         final l = _db(slowP);
         las.add(l);
+        laf.add(_db(fastP));
+        final lq = _leq1Raw();
+        leq1.add(lq.isNaN ? l : lq);
         if (l > maxRaw) maxRaw = l;
         if (l < minRaw) minRaw = l;
         secSq = 0;

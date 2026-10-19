@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'calc_pages.dart';
 import 'core.dart';
 import 'diff.dart';
@@ -7,6 +8,7 @@ import 'glossario_page.dart';
 import 'meter_page.dart';
 import 'norme_pages.dart';
 import 'riverbero_page.dart';
+import 'spettro_page.dart';
 
 void main() => runApp(const App());
 
@@ -75,9 +77,19 @@ class Home extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Image.asset('assets/logo_bianco.png', height: 30, alignment: Alignment.centerLeft),
+                      Row(
+                        children: [
+                          Expanded(child: Image.asset('assets/logo_bianco.png', height: 30, alignment: Alignment.centerLeft)),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(backgroundColor: const Color(0x26FFFFFF), shape: const StadiumBorder()),
+                            onPressed: () => launchUrl(Uri.parse('https://www.studioagfor.com/acustica'), mode: LaunchMode.externalApplication),
+                            icon: const Icon(Icons.language, color: Colors.white, size: 18),
+                            label: const Text('Sito Studio Agfor', style: TextStyle(color: Colors.white, fontSize: 12.5)),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 18),
-                      const Text('EnviNoise', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
+                      Text('EnviNoise $kVersione', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
                       const Text('Strumenti di acustica per il campo', style: TextStyle(color: Color(0xFFBFE3DC), fontSize: 14)),
                     ],
                   ),
@@ -114,6 +126,34 @@ class Home extends StatelessWidget {
                               ),
                             ),
                             const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Material(
+                    color: cTeal,
+                    borderRadius: BorderRadius.circular(22),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () => go(context, const SpettroPage()),
+                      child: const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.equalizer, color: Colors.white, size: 30),
+                            SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Analizzatore di spettro', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
+                                  Text('Bande di 1/3 d\'ottava · versione di prova', style: TextStyle(color: Color(0xFFD8EEE9), fontSize: 12.5)),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
                           ],
                         ),
                       ),
@@ -159,7 +199,7 @@ class Home extends StatelessWidget {
                     crossAxisSpacing: 10,
                     childAspectRatio: 1.25,
                     children: [
-                      mini(context, Icons.map, 'Distanze su mappa', 'Distanze, raggio, edifici', const DistanzaPage()),
+                      mini(context, Icons.map, 'Distanze su mappa', 'Distanze e primo fronte', const DistanzaPage()),
                       mini(context, Icons.menu_book, 'Glossario', 'Cosa sono LA, LR, LAeq...', const GlossarioPage()),
                     ],
                   ),
