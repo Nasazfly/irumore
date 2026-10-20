@@ -111,13 +111,11 @@ class _SpettroState extends State<SpettroPage> {
   @override
   void initState() {
     super.initState();
+    off = Taratura.off;
     SharedPreferences.getInstance().then((p) {
       final c = p.getStringList('bandcorr');
-      if (mounted) {
-        setState(() {
-          off = p.getDouble('offset') ?? 0;
-          if (c != null && c.length == Bank.nb) corr = [for (final v in c) double.tryParse(v) ?? 0.0];
-        });
+      if (mounted && c != null && c.length == Bank.nb) {
+        setState(() => corr = [for (final v in c) double.tryParse(v) ?? 0.0]);
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -238,6 +236,8 @@ class _SpettroState extends State<SpettroPage> {
                       onPressed: () async {
                         final p = await SharedPreferences.getInstance();
                         await p.remove('bandcorr');
+                        await p.remove('bandcorr_date');
+                        Taratura.dataBande = null;
                         setState(() => corr = List.filled(Bank.nb, 0.0));
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
@@ -255,6 +255,9 @@ class _SpettroState extends State<SpettroPage> {
                         }
                         final p = await SharedPreferences.getInstance();
                         await p.setStringList('bandcorr', [for (final v in nuove) v.toString()]);
+                        final quando = oraTesto(DateTime.now());
+                        await p.setString('bandcorr_date', quando);
+                        Taratura.dataBande = quando;
                         setState(() => corr = nuove);
                         if (ctx.mounted) Navigator.pop(ctx);
                       },
@@ -275,7 +278,8 @@ class _SpettroState extends State<SpettroPage> {
     final l = livelli();
     final tot = totale(l);
     return page('Analizzatore di spettro', [
-      const InfoBox('Versione di prova: bande di 1/3 d\'ottava da 25 Hz a 12,5 kHz. Sotto circa 100 Hz e sopra 8 kHz il microfono del telefono è poco attendibile (bande in colore chiaro). Per un confronto serio si consiglia la taratura per banda con il tuo fonometro.', color: cWarn, icon: Icons.science),
+      const InfoBox('Versione di prova: bande di 1/3 d\'ottava da 25 Hz a 12,5 kHz. Sotto circa 100 Hz e sopra 8 kHz il microfono del telefono è poco attendibile (bande in colore chiaro). Per un confronto attendibile si consiglia la taratura per banda con il proprio fonometro.', color: cWarn, icon: Icons.science),
+      InfoBox('${Taratura.frase()}\n${Taratura.fraseBande()}', icon: Icons.tune),
       Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),

@@ -10,7 +10,11 @@ import 'norme_pages.dart';
 import 'riverbero_page.dart';
 import 'spettro_page.dart';
 
-void main() => runApp(const App());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Taratura.carica();
+  runApp(const App());
+}
 
 class App extends StatelessWidget {
   const App({super.key});

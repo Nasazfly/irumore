@@ -126,6 +126,16 @@ class _RiverState extends State<RiverberoPage> {
                 });
                 await salvaUtente();
                 if (ctx.mounted) Navigator.pop(ctx);
+                if (!mounted) return;
+                showDialog(
+                  context: context,
+                  builder: (d) => AlertDialog(
+                    icon: const Icon(Icons.check_circle, color: cOk, size: 36),
+                    title: const Text('Materiale aggiunto'),
+                    content: Text('"${mat.nome}" (${mat.unita ? '${f1(mat.a, 2)} m² sabine per unità' : 'α = ${f1(mat.a, 2)}'}) è stato salvato nell\'archivio ed è già selezionato nell\'ultima riga. Lo ritroverai nei menù a tendina anche le prossime volte.'),
+                    actions: [FilledButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))],
+                  ),
+                );
               },
               child: const Text('Salva'),
             ),

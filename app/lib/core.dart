@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'glossario.dart';
 import 'schemi.dart';
 
-const kVersione = '7.0';
+const kVersione = '8.0';
 
-const appVersion = '7.0';
+const appVersion = '8.0';
 
 const cTeal = Color(0xFF0F6F61);
 const cDark = Color(0xFF0A4A41);
@@ -303,6 +303,39 @@ class Apribile extends StatelessWidget {
 }
 
 /// Avviso obbligatorio per le funzioni di misura con il microfono dello smartphone.
+String oraTesto(DateTime d) {
+  String t(int v) => v.toString().padLeft(2, '0');
+  return '${t(d.day)}/${t(d.month)}/${d.year} alle ${t(d.hour)}:${t(d.minute)}';
+}
+
+/// Taratura memorizzata sul telefono: offset del fonometro e data della taratura per banda.
+class Taratura {
+  static double off = 0;
+  static String? data; // momento in cui è stato impostato l'offset
+  static String? dataBande; // momento della taratura per banda dell'analizzatore di spettro
+
+  static Future<void> carica() async {
+    final p = await SharedPreferences.getInstance();
+    off = p.getDouble('offset') ?? 0;
+    data = p.getString('offset_date');
+    dataBande = p.getString('bandcorr_date');
+  }
+
+  static Future<void> imposta(double v, String quando) async {
+    off = v;
+    data = quando;
+    final p = await SharedPreferences.getInstance();
+    await p.setDouble('offset', v);
+    await p.setString('offset_date', quando);
+  }
+
+  static String frase() => data == null
+      ? 'Nessuna taratura memorizzata (offset 0,0 dB): i valori non sono attendibili finché non tari il telefono con il tuo fonometro.'
+      : 'Taratura attiva: ${off >= 0 ? '+' : ''}${f1(off)} dB · impostata il $data';
+
+  static String fraseBande() => dataBande == null ? 'Nessuna taratura per banda memorizzata.' : 'Taratura per banda memorizzata il $dataBande.';
+}
+
 Future<bool> mostraAvviso(BuildContext context) async {
   var ok = false;
   final r = await showDialog<bool>(
@@ -317,6 +350,12 @@ Future<bool> mostraAvviso(BuildContext context) async {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('La misura eseguita con il microfono dello smartphone non è conforme alla norma IEC 61672 (non è uno strumento di classe 1 o 2) e non è tarata da un laboratorio accreditato.\n\nI valori sono indicativi e NON sono utilizzabili in relazioni tecniche ufficiali, perizie o contenziosi legali.'),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: cMint, borderRadius: BorderRadius.circular(10)),
+                child: Text(Taratura.frase(), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cInk)),
+              ),
               const SizedBox(height: 8),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,

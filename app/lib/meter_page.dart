@@ -8,7 +8,6 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'core.dart';
 import 'diff.dart';
@@ -52,59 +51,12 @@ class _MeterPageState extends State<MeterPage> {
   @override
   void initState() {
     super.initState();
-    carica();
-  }
-
-  Future<void> carica() async {
-    final p = await SharedPreferences.getInstance();
-    off = p.getDouble('offset') ?? 0;
-    offDate = p.getString('offset_date');
-    if (mounted) setState(() {});
-    if (mounted) await avviso();
-  }
-
-  Future<void> avviso() async {
-    var ok = false;
-    final tar = offDate == null
-        ? 'Nessuna taratura memorizzata: i valori non sono attendibili finché non tari il telefono con il tuo fonometro.'
-        : 'Taratura memorizzata: ${segno(off)}${f1(off)} dB (impostata il $offDate).';
-    final r = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, ss) => AlertDialog(
-          title: const Text('Misura indicativa'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('La misura eseguita con il microfono dello smartphone non è conforme alla norma IEC 61672 (non è uno strumento di classe 1 o 2) e non è tarata da un laboratorio accreditato.\n\nI valori sono indicativi e NON sono utilizzabili in relazioni tecniche ufficiali, perizie o contenziosi legali.'),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: cMint, borderRadius: BorderRadius.circular(10)),
-                  child: Text(tar, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: cInk)),
-                ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: ok,
-                  onChanged: (v) => ss(() => ok = v ?? false),
-                  title: const Text('Ho letto e sono consapevole che la misura non è a norma e non è valida per relazioni o contenziosi.', style: TextStyle(fontSize: 13.5)),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Esci')),
-            FilledButton(onPressed: ok ? () => Navigator.pop(ctx, true) : null, child: const Text('Continua')),
-          ],
-        ),
-      ),
-    );
-    if (r != true && mounted) Navigator.pop(context);
+    off = Taratura.off;
+    offDate = Taratura.data;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final ok = await mostraAvviso(context);
+      if (!ok && mounted) Navigator.pop(context);
+    });
   }
 
   void snap() {
@@ -182,15 +134,13 @@ class _MeterPageState extends State<MeterPage> {
 
   Future<void> setOff(double v) async {
     final x = (v.clamp(-60.0, 60.0) * 10).round() / 10;
-    final data = stamp(DateTime.now()).substring(0, 10);
+    final quando = oraTesto(DateTime.now());
     setState(() {
       off = x;
-      offDate = data;
+      offDate = quando;
     });
     snap();
-    final p = await SharedPreferences.getInstance();
-    await p.setDouble('offset', x);
-    await p.setString('offset_date', data);
+    await Taratura.imposta(x, quando);
   }
 
   void taratura() {
@@ -366,6 +316,31 @@ class _MeterPageState extends State<MeterPage> {
       if (clip) const InfoBox('Saturazione del microfono: livello non attendibile. Si consiglia di allontanare il telefono dalla sorgente.', color: cBad, icon: Icons.warning_amber),
       if (rich == true) InfoBox('Il LAeq supera la soglia di applicabilità del differenziale (${f1(soglia(DiffState.i.notte, DiffState.i.aperte), 0)} dB(A)): verifica differenziale necessaria. Vedi il riquadro in fondo alla pagina.', color: cWarn, icon: Icons.rule),
       Row(children: [stat('LAeq', f1(leq), 'LAeq'), stat(nMax[modo], f1(mx), kMax[modo]), stat(nMin[modo], f1(mn), kMin[modo])]),
+      const SizedBox(height: 8),
+      Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: cLine)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Text('Livelli statistici · ${['LAS', 'LAF', 'LAeq,1s'][modo]}', style: const TextStyle(color: cDark, fontSize: 12, fontWeight: FontWeight.w700)),
+              const InfoDot('LN'),
+            ]),
+            Row(
+              children: [
+                for (final n in [1, 10, 50, 90, 99])
+                  Expanded(
+                    child: Column(children: [
+                      Text('L$n', style: const TextStyle(color: cDark, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      Text(f1(m.livStat(modo, n.toDouble(), off)), style: const TextStyle(color: cInk, fontSize: 18, fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
       const SizedBox(height: 12),
       RepaintBoundary(
         key: gkey,
@@ -388,6 +363,11 @@ class _MeterPageState extends State<MeterPage> {
               Text(
                 'LAeq ${f1(leq)} dB(A)  ·  ${nMax[modo]} ${f1(mx)}  ·  ${nMin[modo]} ${f1(mn)}  ·  durata ${mmss(m.seconds)}',
                 style: const TextStyle(color: cInk, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'L1 ${f1(m.livStat(modo, 1, off))}  ·  L10 ${f1(m.livStat(modo, 10, off))}  ·  L50 ${f1(m.livStat(modo, 50, off))}  ·  L90 ${f1(m.livStat(modo, 90, off))}  ·  L99 ${f1(m.livStat(modo, 99, off))}',
+                style: const TextStyle(color: cInk, fontSize: 12.5, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
               SizedBox(height: 190, width: double.infinity, child: CustomPaint(painter: ChartPainter(ser, leq))),

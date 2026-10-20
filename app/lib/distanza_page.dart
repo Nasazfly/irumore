@@ -106,7 +106,6 @@ class _DistState extends State<DistanzaPage> {
   LatLng? me, origin, b;
   int modo = 0;
   double raggio = 100;
-  bool aerea = false;
   final ric = <LatLng>[];
   List<_Pol> primi = [];
   List<_Pol> altri = [];
@@ -280,16 +279,6 @@ class _DistState extends State<DistanzaPage> {
         foregroundColor: cInk,
         elevation: 0,
         scrolledUnderElevation: 0,
-        actions: [
-          PopupMenuButton<bool>(
-            icon: const Icon(Icons.layers),
-            onSelected: (v) => setState(() => aerea = v),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: false, child: Text('Mappa OpenStreetMap')),
-              PopupMenuItem(value: true, child: Text('Foto aerea (2009-2012)')),
-            ],
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
@@ -331,31 +320,16 @@ class _DistState extends State<DistanzaPage> {
                   onLongPress: (tp, p) => setState(() => origin = p),
                 ),
                 children: [
-                  if (aerea)
-                    TileLayer(
-                      wmsOptions: WMSTileLayerOptions(
-                        baseUrl: 'http://wms.pcn.minambiente.it/ogc?map=/ms_ogc/WMS_v1.3/raster/ortofoto_colore_12.map&',
-                        layers: const ['OI.ORTOIMMAGINI.2012'],
-                        format: 'image/jpeg',
-                        transparent: false,
-                      ),
-                      userAgentPackageName: 'it.studioagfor.irumore',
-                      maxNativeZoom: 19,
-                    )
-                  else
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'it.studioagfor.irumore',
-                      maxNativeZoom: 19,
-                    ),
+                  TileLayer(
+                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'it.studioagfor.irumore',
+                    maxNativeZoom: 19,
+                  ),
                   if (modo == 0 && pa != null && b != null) PolylineLayer(polylines: [Polyline(points: [pa, b!], color: const Color(0xFFE8704A), strokeWidth: 4)]),
                   PolygonLayer(polygons: poligoni),
                   CircleLayer(circles: cerchi),
                   MarkerLayer(markers: markers),
-                  RichAttributionWidget(attributions: [
-                    const TextSourceAttribution('© OpenStreetMap contributors'),
-                    if (aerea) const TextSourceAttribution('Ortofoto AGEA 2009-2012: Geoportale Nazionale (MASE)'),
-                  ]),
+                  const RichAttributionWidget(attributions: [TextSourceAttribution('© OpenStreetMap contributors')]),
                 ],
               ),
             ),

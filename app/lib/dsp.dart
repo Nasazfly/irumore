@@ -30,6 +30,10 @@ class LevelMeter {
   int _binIdx = 0, _binFilled = 0, _binN = 0;
   double _binSum = 0;
   int _fineN = 0;
+  // istogrammi per i livelli statistici (0 = LAS, 1 = LAF, 2 = LAeq,1s), campionati ogni 100 ms
+  static const hMin = -140.0, hStep = 0.25, hN = 600;
+  final _hist = [Int32List(hN), Int32List(hN), Int32List(hN)];
+  final _hCnt = [0, 0, 0];
   // serie campionate ogni secondo (valori grezzi, senza offset)
   final las = <double>[];
   final laf = <double>[];
@@ -64,6 +68,10 @@ class LevelMeter {
     _binN = 0;
     _binSum = 0;
     _fineN = 0;
+    for (var k = 0; k < 3; k++) {
+      _hist[k].fillRange(0, hN, 0);
+      _hCnt[k] = 0;
+    }
     las.clear();
     laf.clear();
     leq1.clear();
@@ -120,6 +128,28 @@ class LevelMeter {
   List<double> series(double off) => [for (final v in las) v + base + off];
   List<double> seriesF(double off) => [for (final v in laf) v + base + off];
   List<double> seriesL(double off) => [for (final v in leq1) v + base + off];
+
+  void _acc(int k, double raw) {
+    if (raw.isNaN || raw < -190) return;
+    var i = ((raw - hMin) / hStep).floor();
+    if (i < 0) i = 0;
+    if (i >= hN) i = hN - 1;
+    _hist[k][i]++;
+    _hCnt[k]++;
+  }
+
+  /// Livello superato per il [n]% del tempo (k: 0 LAS, 1 LAF, 2 LAeq,1s), dall'avvio o dall'ultimo reset.
+  double livStat(int k, double n, double off) {
+    final tot = _hCnt[k];
+    if (tot < 20) return double.nan;
+    final target = tot * n / 100;
+    var cum = 0;
+    for (var i = hN - 1; i >= 0; i--) {
+      cum += _hist[k][i];
+      if (cum >= target) return hMin + (i + 0.5) * hStep + base + off;
+    }
+    return double.nan;
+  }
 
   void process(Uint8List input) {
     var bytes = input;
@@ -191,6 +221,8 @@ class LevelMeter {
         if (_binFilled < 10) _binFilled++;
         _binSum = 0;
         _binN = 0;
+        _acc(0, _db(slowP));
+        _acc(1, _db(fastP));
         if (_binFilled == 10) {
           var s = 0.0;
           for (final b in _bins) {
@@ -199,6 +231,7 @@ class LevelMeter {
           final l1 = _db(s / (10 * binLen));
           if (l1 > l1MaxRaw) l1MaxRaw = l1;
           if (l1 < l1MinRaw) l1MinRaw = l1;
+          _acc(2, l1);
         }
       }
       if (secN >= fs) {
